@@ -1,0 +1,42 @@
+/* Shine-like Design System for IRTS */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Shine palette */
+  --shine-bg: #FAFBFC;
+  --shine-surface: #FFFFFF;
+  --shine-border: #E8ECF0;
+  --shine-border-light: #F0F2F5;
+  --shine-primary: #4C35E0;
+  --shine-primary-hover: #3D2AB8;
+  --shine-primary-light: #EDE9FC;
+  --shine-text: #1A1D26;
+  --shine-text-secondary: #6B7280;
+  --shine-text-tertiary: #9CA3AF;
+}
+
+/* Modern Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Selection */
+::selection {
+  background-color: rgba(76, 53, 224, 0.15);
+  color: inherit;
+}

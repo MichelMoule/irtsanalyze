@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-shine-bg text-shine-text-primary font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans tracking-tight text-shine-text-primary;
+  }
+}
+
+@layer components {
+  /* Shine Card - flat white surface */
+  .shine-card {
+    @apply bg-white border border-shine-border rounded-xl;
+  }
+
+  /* Backward compat: glass-card now maps to shine-card */
+  .glass-card {
+    @apply bg-white border border-shine-border rounded-xl;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-lg font-medium text-sm
+           transition-colors duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed
+           focus-ring;
+  }
+
+  .btn-primary {
+    @apply bg-primary-500 text-white
+           hover:bg-primary-600
+           px-4 py-2.5;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-shine-text-primary
+           border border-shine-border
+           hover:bg-shine-hover-bg
+           px-4 py-2.5;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-shine-text-secondary
+           hover:bg-shine-hover-bg
+           px-4 py-2.5;
+  }
+
+  .btn-danger {
+    @apply bg-red-500 text-white
+           hover:bg-red-600
+           px-4 py-2.5;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-lg
+           bg-white border border-shine-border
+           text-shine-text-primary text-sm
+           placeholder:text-shine-text-tertiary
+           focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30
+           transition-colors duration-150;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5
+           rounded-full text-xs font-medium;
+  }
+
+  .badge-imported {
+    @apply bg-slate-100 text-slate-600;
+  }
+
+  .badge-analyzing {
+    @apply bg-blue-50 text-blue-600;
+  }
+
+  .badge-analyzed {
+    @apply bg-purple-50 text-purple-600;
+  }
+
+  .badge-reviewing {
+    @apply bg-amber-50 text-amber-600;
+  }
+
+  .badge-validated {
+    @apply bg-emerald-50 text-emerald-600;
+  }
+
+  .badge-error {
+    @apply bg-red-50 text-red-600;
+  }
+
+  /* Focus Ring */
+  .focus-ring {
+    @apply outline-none
+           focus-visible:ring-2 focus-visible:ring-primary-500/40
+           focus-visible:ring-offset-1 focus-visible:ring-offset-white;
+  }
+
+  /* Divider */
+  .divider {
+    @apply h-px bg-shine-border;
+  }
+
+  /* Loading skeleton */
+  .skeleton {
+    @apply animate-pulse bg-slate-100 rounded-lg;
+  }
+}

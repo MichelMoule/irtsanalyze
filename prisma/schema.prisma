@@ -1,0 +1,265 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Modèle pour gérer les campagnes annuelles
+model Campagne {
+  id                String      @id @default(cuid())
+  annee             Int?        @unique // 2024, 2025, etc.
+  nom               String      @default("Parcoursup 2025") // "Parcoursup 2025"
+  libelle           String?     // "Campagne 2024-2025" (optionnel, pour compatibilité)
+  description       String?
+
+  // Statut de la campagne
+  statut            String      @default("preparation") // preparation, en_cours, cloturee, archivee
+
+  // Dates importantes
+  dateDebut         DateTime?
+  dateFin           DateTime?
+  dateCreation      DateTime    @default(now())
+
+  // Relations
+  candidats         Candidat[]
+
+  @@map("campagnes")
+}
+
+// Modèle pour stocker les candidats avec toutes leurs données Parcoursup
+model Candidat {
+  id                    String   @id @default(cuid())
+  numeroDossier         String   @unique
+  nom                   String
+  prenom                String
+  dateNaissance         String?
+  email                 String?
+  telephone             String?
+  serieBac              String?
+  mentionBac            String?
+  etablissementOrigine  String?
+
+  // Données scolaires
+  moyenneGenerale       Float?
+  moyenneFrancais       Float?
+  moyenneHistoireGeo    Float?
+  moyennePhilosophie    Float?
+  moyenneMaths          Float?
+  evolutionNotes        String?
+
+  // Informations admission (Procédure V2)
+  filiereDemandee       String?  // ES, EJE, ASS
+  statutDemande         String?  // FI, CA, FI+CA
+  procedureAdmission    String?  // admis_de_droit, etude_dossier_oral, les_deux
+  bacObtenu             String?  // oui, non, en_cours
+  typeBac               String?  // général, technologique, professionnel
+  anneeBac              String?
+  rqthMdph              String?  // oui, non, en_cours
+
+  // Résultats de l'analyse IA (dénormalisé pour simplifier)
+  syntheseAppreciations String?
+  motsClesPositifs      String   @default("[]") // JSON array
+  motsClesNegatifs      String   @default("[]") // JSON array
+  alertes               String   @default("[]") // JSON array
+  elementsValorisants   String   @default("[]") // JSON array
+  cotationIAProposee    Float    @default(0)
+
+  // Sous-notes IA (dénormalisées - Procédure V2)
+  noteParcoursScolaire        Float?   // /3
+  commentaireParcoursScolaire String?
+  noteExperiences             Float?   // /3
+  commentaireExperiences      String?
+  noteMotivation              Float?   // /2
+  commentaireMotivation       String?
+
+  // Validation et notation finale
+  cotationFinale        Float?
+  commentaireEvaluateur String?
+  validateurNom         String?
+  dateValidation        DateTime?
+
+  // Données Parcoursup brutes (JSON)
+  donneesParcoursup     String   @default("{}") // Stockage JSON des données complètes
+
+  // Campagne associée
+  campagneId            String?
+  campagne              Campagne? @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+
+  // Workflow
+  statut                String   @default("importe") // importe, en_analyse_ia, analyse, en_relecture, valide, erreur
+  dateImport            DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  analyses              AnalyseIA[]
+  validations           Validation[]
+  commentaires          Commentaire[]
+  historiqueStatuts     HistoriqueStatut[]
+  oralAdmission         OralAdmission?
+
+  @@map("candidats")
+  @@index([campagneId])
+  @@index([numeroDossier])
+  @@index([statut])
+}
+
+// Modèle pour stocker les analyses IA
+model AnalyseIA {
+  id                String   @id @default(cuid())
+  candidatId        String
+
+  // Résultats de l'analyse (anciens champs conservés pour compatibilité)
+  syntheseAppreciations String?
+  motsClesPositifs      String   // JSON array de mots-clés
+  motsClesNegatifs      String   // JSON array de mots-clés
+  alertes               String   // JSON array d'alertes
+  elementsValorisants   String   // JSON array d'éléments valorisants
+  cotationIAProposee    Float
+  justificationIA       String
+
+  // Sous-notes par critère (Procédure V2)
+  noteParcoursScolaire        Float?   // /3 (paliers: 0, 0.5, 1, 1.5, 2, 2.5, 3)
+  commentaireParcoursScolaire String?  // Justification structurée
+  noteExperiences             Float?   // /3 (paliers: 0, 0.5, 1, 1.5, 2, 2.5, 3)
+  commentaireExperiences      String?  // Justification structurée
+  noteMotivation              Float?   // /2 (paliers: 0, 0.5, 1, 1.5, 2)
+  commentaireMotivation       String?  // Justification structurée
+
+  // Métadonnées
+  dateAnalyse           DateTime @default(now())
+  versionModele         String   @default("v1.0")
+
+  // Relations
+  candidat              Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
+
+  @@map("analyses_ia")
+}
+
+// Modèle pour l'oral d'admission (jury de 2 personnes, candidats FI)
+model OralAdmission {
+  id                          String   @id @default(cuid())
+  candidatId                  String   @unique
+
+  // 4 critères notés sur /3 chacun
+  noteParticipationCollectif    Float?  // /3
+  noteExpressionEmotions        Float?  // /3
+  noteAnalyseTS                 Float?  // /3 (Capacité d'analyse et mise en lien avec TS)
+  notePresentationIndividuelle  Float?  // /3
+  noteTotal                     Float?  // /12
+
+  // Jury
+  jury1Nom                    String?
+  jury2Nom                    String?
+
+  // Commentaires et observations
+  commentaires                String?
+  pointsVigilance             String?
+
+  // Traçabilité
+  dateOral                    DateTime?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  // Relations
+  candidat                    Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
+
+  @@map("oral_admissions")
+}
+
+// Modèle pour stocker les validations humaines
+model Validation {
+  id              String   @id @default(cuid())
+  candidatId      String
+  
+  // Informations de validation
+  statut          String   @default("en_relecture") // en_relecture, valide, rejete
+  cotationFinale  Float?
+  commentaire     String?
+  
+  // Traçabilité
+  validateurId    String?
+  validateurNom   String?
+  dateValidation  DateTime?
+  
+  // Relations
+  candidat        Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
+  
+  @@map("validations")
+}
+
+// Modèle pour les utilisateurs (prêt pour SSO Azure AD)
+model Utilisateur {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  nom           String
+  prenom        String
+
+  // Azure AD
+  azureId       String?  @unique // ID Azure AD
+  azureTenantId String?  // Tenant ID
+
+  // Rôles et permissions
+  role          String   @default("evaluateur") // administrateur, evaluateur, lecteur
+  estActif      Boolean  @default(true)
+
+  // Traçabilité
+  dateCreation  DateTime @default(now())
+  derniereConnexion DateTime?
+
+  @@map("utilisateurs")
+}
+
+// Modèle pour les commentaires sur les candidats
+model Commentaire {
+  id            String   @id @default(cuid())
+  candidatId    String
+
+  // Contenu du commentaire
+  contenu       String
+  type          String   @default("general") // general, alerte, decision, suivi
+
+  // Auteur
+  auteurId      String?
+  auteurNom     String   // Nom complet de l'auteur
+
+  // Traçabilité
+  dateCreation  DateTime @default(now())
+  dateModification DateTime @updatedAt
+  estModifie    Boolean  @default(false)
+
+  // Relations
+  candidat      Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
+
+  @@map("commentaires")
+}
+
+// Modèle pour l'historique des changements de statut
+model HistoriqueStatut {
+  id              String   @id @default(cuid())
+  candidatId      String
+
+  // Changement de statut
+  ancienStatut    String?
+  nouveauStatut   String
+  motif           String?   // Raison du changement
+
+  // Auteur du changement
+  auteurId        String?
+  auteurNom       String?
+
+  // Traçabilité
+  dateChangement  DateTime @default(now())
+
+  // Relations
+  candidat        Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
+
+  @@map("historique_statuts")
+}
