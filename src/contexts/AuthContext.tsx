@@ -61,24 +61,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
 
     try {
-      // En mode développement, utiliser un utilisateur mock
-      if (import.meta.env.DEV) {
-        const mockUser = localStorage.getItem('irts-mock-user');
-        if (mockUser) {
-          setUser(JSON.parse(mockUser));
-        }
-      } else {
-        // TODO: Implémenter la vérification MSAL réelle
-        // const accounts = msalInstance.getAllAccounts();
-        // if (accounts.length > 0) {
-        //   const account = accounts[0];
-        //   setUser({
-        //     id: account.localAccountId,
-        //     email: account.username,
-        //     nom: account.name?.split(' ')[1] || '',
-        //     prenom: account.name?.split(' ')[0] || '',
-        //   });
-        // }
+      // TODO: Remplacer par MSAL quand Azure AD sera configuré
+      const mockUser = localStorage.getItem('irts-mock-user');
+      if (mockUser) {
+        setUser(JSON.parse(mockUser));
       }
     } catch (err) {
       console.error('Erreur lors de la vérification de l\'authentification:', err);
@@ -96,27 +82,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
 
     try {
-      // En mode développement, utiliser un mock
-      if (import.meta.env.DEV) {
-        const mockUser: User = {
-          id: '1',
-          email: 'evaluateur@irts.fr',
-          nom: 'Dupont',
-          prenom: 'Jean',
-          role: 'evaluateur',
-        };
-        setUser(mockUser);
-        localStorage.setItem('irts-mock-user', JSON.stringify(mockUser));
-      } else {
-        // TODO: Implémenter la connexion MSAL réelle
-        // const response = await msalInstance.loginPopup(loginRequest);
-        // setUser({
-        //   id: response.account.localAccountId,
-        //   email: response.account.username,
-        //   nom: response.account.name?.split(' ')[1] || '',
-        //   prenom: response.account.name?.split(' ')[0] || '',
-        // });
-      }
+      // TODO: Remplacer par MSAL quand Azure AD sera configuré
+      const mockUser: User = {
+        id: '1',
+        email: 'evaluateur@irts.fr',
+        nom: 'Dupont',
+        prenom: 'Jean',
+        role: 'evaluateur',
+      };
+      setUser(mockUser);
+      localStorage.setItem('irts-mock-user', JSON.stringify(mockUser));
     } catch (err) {
       console.error('Erreur lors de la connexion:', err);
       setError('Échec de la connexion');
@@ -133,12 +108,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null);
     setError(null);
 
-    if (import.meta.env.DEV) {
-      localStorage.removeItem('irts-mock-user');
-    } else {
-      // TODO: Implémenter la déconnexion MSAL réelle
-      // msalInstance.logoutPopup();
-    }
+    // TODO: Remplacer par MSAL quand Azure AD sera configuré
+    localStorage.removeItem('irts-mock-user');
   };
 
   const value: AuthContextType = {
