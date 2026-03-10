@@ -4,20 +4,57 @@ const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 
 const app = express();
-const prisma = new PrismaClient({
+const PORT = process.env.PORT || 3003;
+
+// Ensure DATABASE_URL has pgbouncer params when using Supabase connection pooler (port 6543)
+function getDatabaseUrl() {
+  let url = process.env.DATABASE_URL;
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.port === '6543') {
+      if (!parsed.searchParams.has('pgbouncer')) {
+        parsed.searchParams.set('pgbouncer', 'true');
+      }
+      if (!parsed.searchParams.has('connection_limit')) {
+        parsed.searchParams.set('connection_limit', '1');
+      }
+      url = parsed.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
+let prisma = new PrismaClient({
   datasources: {
-    db: { url: process.env.DATABASE_URL },
+    db: { url: getDatabaseUrl() },
   },
   log: ['error', 'warn'],
 });
-const PORT = process.env.PORT || 3003;
 
-// Keep Supabase connection alive — reconnect on idle timeout
+// Keep Supabase connection alive with reconnect on failure
 setInterval(async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-  } catch (_) {
-    console.warn('⚠️ DB keepalive failed, Prisma will reconnect automatically');
+  } catch (err) {
+    console.warn('⚠️ DB keepalive failed, attempting reconnect...', err.message);
+    try {
+      await prisma.$disconnect();
+    } catch {}
+    prisma = new PrismaClient({
+      datasources: {
+        db: { url: getDatabaseUrl() },
+      },
+      log: ['error', 'warn'],
+    });
+    try {
+      await prisma.$connect();
+      console.log('✅ DB reconnected successfully');
+    } catch (reconnectErr) {
+      console.error('❌ DB reconnect failed:', reconnectErr.message);
+    }
   }
 }, 60_000);
 
