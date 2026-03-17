@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { Candidat } from '@/types';
 
 interface BulkValidateDialogProps {
@@ -24,41 +24,43 @@ export function BulkValidateDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white border border-shine-border rounded-xl shadow-dropdown max-w-2xl w-full max-h-[80vh] overflow-hidden"
+        transition={{ duration: 0.15 }}
+        className="bg-white border border-gray-200 rounded-lg max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-shine-border">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center">
-              <CheckCircle className="w-4 h-4 text-white" />
+            <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-shine-text-primary">
-                Validation en masse
-              </h3>
-              <p className="text-sm text-shine-text-secondary">
+              <h3 className="text-base font-bold text-flat-fg">Validation en masse</h3>
+              <p className="text-xs text-flat-text-tertiary mt-0.5">
                 {candidats.length} candidat{candidats.length > 1 ? 's' : ''} a valider
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="p-1.5 text-shine-text-tertiary hover:text-shine-text-primary hover:bg-shine-hover-bg rounded-lg transition-colors disabled:opacity-50"
-            title="Fermer"
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-flat-text-tertiary hover:text-flat-fg transition-colors disabled:opacity-40"
+            aria-label="Fermer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
+        {/* Warning */}
         {hasAlertes && (
-          <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="mx-6 mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex-shrink-0">
             <div className="flex gap-3">
               <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-amber-800 text-sm">Attention</p>
-                <p className="text-sm text-amber-700 mt-0.5">
+                <p className="text-sm font-semibold text-amber-800">Attention</p>
+                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
                   Certains candidats selectionnes ont des alertes. Verifiez leurs dossiers avant validation.
                 </p>
               </div>
@@ -66,15 +68,16 @@ export function BulkValidateDialog({
           </div>
         )}
 
-        <div className="px-6 py-4 max-h-96 overflow-y-auto">
-          <h4 className="text-sm font-medium text-shine-text-secondary mb-3">
-            Candidats a valider :
-          </h4>
-          <div className="space-y-2">
+        {/* Candidat list */}
+        <div className="px-6 py-4 overflow-y-auto flex-1">
+          <p className="text-xs font-semibold text-flat-text-tertiary uppercase tracking-widest mb-3">
+            Candidats concernes
+          </p>
+          <div className="space-y-1.5">
             {candidats.map((candidat) => (
               <div
                 key={candidat.id}
-                className="flex items-center justify-between p-3 bg-shine-bg rounded-lg border border-shine-border"
+                className="flex items-center justify-between px-3.5 py-2.5 bg-gray-100 rounded-lg border border-gray-200"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0">
@@ -82,28 +85,24 @@ export function BulkValidateDialog({
                       {candidat.prenom[0]}{candidat.nom[0]}
                     </span>
                   </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-medium text-shine-text-primary truncate">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-flat-fg truncate">
                       {candidat.prenom} {candidat.nom}
-                    </span>
-                    <span className="text-xs text-shine-text-secondary font-mono">
-                      {candidat.numeroDossier}
-                    </span>
+                    </p>
+                    <p className="text-xs text-flat-text-tertiary font-mono">{candidat.numeroDossier}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 flex-shrink-0">
                   {candidat.alertes.length > 0 && (
                     <div className="flex items-center gap-1 text-amber-500">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      <span className="text-xs font-semibold">
-                        {candidat.alertes.length}
-                      </span>
+                      <AlertTriangle className="w-3 h-3" />
+                      <span className="text-xs font-bold">{candidat.alertes.length}</span>
                     </div>
                   )}
                   {candidat.cotationIAProposee !== undefined && (
-                    <div className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full text-xs font-semibold">
+                    <span className="text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-md">
                       {candidat.cotationIAProposee}/8
-                    </div>
+                    </span>
                   )}
                 </div>
               </div>
@@ -111,27 +110,30 @@ export function BulkValidateDialog({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 bg-shine-bg border-t border-shine-border rounded-b-xl">
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2.5 px-6 py-4 bg-gray-100 border-t border-gray-200 flex-shrink-0">
           <button
+            type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="btn btn-secondary px-4 py-2 text-sm disabled:opacity-50"
+            className="btn btn-secondary"
           >
             Annuler
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className="btn bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2 text-sm disabled:opacity-50 flex items-center gap-2"
+            className="btn bg-emerald-500 hover:bg-emerald-600 text-white  disabled:opacity-50"
           >
             {isLoading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Validation en cours...
+                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Validation...
               </>
             ) : (
               <>
-                <CheckCircle className="w-4 h-4" />
+                <CheckCircle2 className="w-4 h-4" />
                 Confirmer la validation
               </>
             )}

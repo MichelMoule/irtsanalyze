@@ -31,7 +31,7 @@ export class DatabaseService {
       const scolarite = candidatData.Scolarite || [];
       const baccalaureat = candidatData.Baccalaureat || {};
 
-      const moyennes = this.calculerMoyennesBac(baccalaureat);
+      const moyennes = this.calculerMoyennesBac(candidatData);
       const etablissementOrigine = this.getEtablissementOrigine(scolarite);
 
       const candidat = await prisma.candidat.create({
@@ -427,29 +427,19 @@ export class DatabaseService {
 
   // ─── HELPERS ───────────────────────────────────────────────
 
-  private static calculerMoyennesBac(baccalaureat: any): {
+  private static calculerMoyennesBac(candidatData: any): {
     generale: number | null;
     francais: number | null;
     histoireGeo: number | null;
     philosophie: number | null;
     maths: number | null;
   } {
-    const notes = baccalaureat.NotesBaccalaureat || [];
+    // Les NotesBaccalaureat sont au niveau racine du candidat, pas dans l'objet Baccalaureat
+    const notes = candidatData.NotesBaccalaureat || [];
 
     if (notes.length === 0) {
       return { generale: null, francais: null, histoireGeo: null, philosophie: null, maths: null };
     }
-
-    const moyenneGenerale = notes.find((note: any) => note.EpreuveLibelle === 'Moyenne générale');
-    const noteFrancais = notes.find((note: any) =>
-      note.EpreuveLibelle?.includes('Fran') || note.EpreuveLibelle?.includes('fran')
-    );
-    const noteHistoireGeo = notes.find((note: any) =>
-      note.EpreuveLibelle?.includes('Histoire') || note.EpreuveLibelle?.includes('Géo')
-    );
-    const notePhilosophie = notes.find((note: any) =>
-      note.EpreuveLibelle?.includes('Philosophie')
-    );
 
     const extraireNote = (noteBrut: any): number | null => {
       if (!noteBrut?.NoteEpreuve) return null;
@@ -457,12 +447,37 @@ export class DatabaseService {
       return isNaN(note) ? null : note;
     };
 
+    const moyenneGenerale = notes.find((note: any) =>
+      note.EpreuveLibelle === 'Moyenne générale' || note.EpreuveLibelle === 'Moyenne Générale'
+    );
+    const noteFrancais = notes.find((note: any) =>
+      note.EpreuveLibelle?.toLowerCase().includes('fran')
+    );
+    const noteHistoireGeo = notes.find((note: any) =>
+      note.EpreuveLibelle?.toLowerCase().includes('histoire') || note.EpreuveLibelle?.toLowerCase().includes('géo')
+    );
+    const notePhilosophie = notes.find((note: any) =>
+      note.EpreuveLibelle?.toLowerCase().includes('philosophie')
+    );
+    const noteMaths = notes.find((note: any) =>
+      note.EpreuveLibelle?.toLowerCase().includes('math')
+    );
+
+    // Si pas de moyenne générale explicite, calculer depuis les notes disponibles
+    const notesAvecValeurs = notes
+      .map((n: any) => extraireNote(n))
+      .filter((n: number | null): n is number => n !== null);
+
+    const moyenneCalculee = notesAvecValeurs.length >= 3
+      ? Math.round(notesAvecValeurs.reduce((s: number, n: number) => s + n, 0) / notesAvecValeurs.length * 10) / 10
+      : null;
+
     return {
-      generale: extraireNote(moyenneGenerale),
+      generale: extraireNote(moyenneGenerale) ?? moyenneCalculee,
       francais: extraireNote(noteFrancais),
       histoireGeo: extraireNote(noteHistoireGeo),
       philosophie: extraireNote(notePhilosophie),
-      maths: null,
+      maths: extraireNote(noteMaths),
     };
   }
 

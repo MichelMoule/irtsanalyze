@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { PrismaClient } = require('@prisma/client');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -34,6 +35,13 @@ let prisma = new PrismaClient({
   log: ['error', 'warn'],
 });
 
+// Supabase client (server-side, for JWT verification)
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServer = (supabaseUrl && supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
+
 // Keep Supabase connection alive with reconnect on failure
 setInterval(async () => {
   try {
@@ -61,6 +69,74 @@ setInterval(async () => {
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// ==================== AUTH ====================
+
+// Optional auth middleware — extracts user from Bearer token if present
+async function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ') && supabaseServer) {
+    const token = authHeader.slice(7);
+    try {
+      const { data: { user }, error } = await supabaseServer.auth.getUser(token);
+      if (!error && user) {
+        req.authUser = user;
+      }
+    } catch {
+      // Token invalid — continue unauthenticated
+    }
+  }
+  next();
+}
+app.use(optionalAuth);
+
+// Sync Supabase auth user → Prisma Utilisateur table
+app.post('/api/auth/sync-user', async (req, res) => {
+  try {
+    const { id, email, nom, prenom, role } = req.body;
+    if (!id || !email) {
+      return res.status(400).json({ error: 'id et email requis' });
+    }
+
+    const utilisateur = await prisma.utilisateur.upsert({
+      where: { email },
+      create: {
+        id,
+        email,
+        nom: nom || '',
+        prenom: prenom || '',
+        role: role || 'evaluateur',
+        azureId: null,
+        derniereConnexion: new Date(),
+      },
+      update: {
+        nom: nom || undefined,
+        prenom: prenom || undefined,
+        derniereConnexion: new Date(),
+      },
+    });
+
+    res.json({ success: true, utilisateur });
+  } catch (error) {
+    console.error('❌ Erreur sync user:', error);
+    res.status(500).json({ error: 'Erreur lors de la synchronisation utilisateur' });
+  }
+});
+
+// Get current user profile
+app.get('/api/auth/me', async (req, res) => {
+  if (!req.authUser) {
+    return res.status(401).json({ error: 'Non authentifié' });
+  }
+  try {
+    const utilisateur = await prisma.utilisateur.findUnique({
+      where: { email: req.authUser.email }
+    });
+    res.json(utilisateur || { id: req.authUser.id, email: req.authUser.email });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -154,7 +230,12 @@ app.get('/api/candidats', async (req, res) => {
           take: 1
         },
         campagne: true,
-        oralAdmission: true
+        oralAdmission: true,
+        brouillon: true,
+        evaluateursAssignes: true,
+        journalActivite: {
+          orderBy: { date: 'desc' }
+        }
       },
       orderBy: { dateImport: 'desc' }
     });
@@ -181,7 +262,12 @@ app.get('/api/candidats/:id', async (req, res) => {
         validations: {
           orderBy: { dateValidation: 'desc' }
         },
-        oralAdmission: true
+        oralAdmission: true,
+        brouillon: true,
+        evaluateursAssignes: true,
+        journalActivite: {
+          orderBy: { date: 'desc' }
+        }
       }
     });
 
@@ -462,6 +548,49 @@ app.delete('/api/commentaires/:id', async (req, res) => {
   }
 });
 
+// ==================== SUPPRESSION CANDIDATS ====================
+
+// Supprimer tous les candidats
+app.delete('/api/candidats', async (req, res) => {
+  try {
+    const count = await prisma.candidat.count();
+    // Supprimer les données liées d'abord
+    await prisma.commentaire.deleteMany();
+    await prisma.historiqueStatut.deleteMany();
+    await prisma.oralAdmission.deleteMany();
+    await prisma.analyseIA.deleteMany();
+    await prisma.validation.deleteMany();
+    await prisma.candidat.deleteMany();
+    console.log(`🗑️ ${count} candidat(s) supprimé(s)`);
+    res.json({ success: true, deleted: count, message: `${count} candidat(s) supprimé(s)` });
+  } catch (error) {
+    console.error('❌ Erreur API DELETE /candidats:', error);
+    res.status(500).json({ error: 'Erreur lors de la suppression des candidats' });
+  }
+});
+
+// Supprimer des candidats par IDs
+app.post('/api/candidats/delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Aucun ID fourni' });
+    }
+    // Supprimer les données liées d'abord
+    await prisma.commentaire.deleteMany({ where: { candidatId: { in: ids } } });
+    await prisma.historiqueStatut.deleteMany({ where: { candidatId: { in: ids } } });
+    await prisma.oralAdmission.deleteMany({ where: { candidatId: { in: ids } } });
+    await prisma.analyseIA.deleteMany({ where: { candidatId: { in: ids } } });
+    await prisma.validation.deleteMany({ where: { candidatId: { in: ids } } });
+    const result = await prisma.candidat.deleteMany({ where: { id: { in: ids } } });
+    console.log(`🗑️ ${result.count} candidat(s) supprimé(s)`);
+    res.json({ success: true, deleted: result.count, message: `${result.count} candidat(s) supprimé(s)` });
+  } catch (error) {
+    console.error('❌ Erreur API POST /candidats/delete:', error);
+    res.status(500).json({ error: 'Erreur lors de la suppression des candidats' });
+  }
+});
+
 // ==================== HISTORIQUE STATUTS ====================
 
 // Récupérer l'historique des statuts d'un candidat
@@ -497,6 +626,440 @@ app.post('/api/candidats/:candidatId/historique', async (req, res) => {
   } catch (error) {
     console.error('❌ Erreur API POST /historique:', error);
     res.status(500).json({ error: 'Erreur lors de la création de l\'historique' });
+  }
+});
+
+// ==================== WORKFLOW & VALIDATION ====================
+
+// Transitions valides : statut actuel → statuts possibles
+const TRANSITIONS_VALIDES = {
+  importe:       ['en_analyse_ia', 'erreur'],
+  en_analyse_ia: ['analyse', 'erreur'],
+  analyse:       ['en_relecture', 'valide', 'erreur'],
+  en_relecture:  ['valide', 'rejete', 'liste_attente', 'analyse', 'erreur'],
+  valide:        ['en_relecture'],          // possibilité de ré-ouvrir
+  rejete:        ['en_relecture', 'analyse'],
+  liste_attente: ['en_relecture', 'valide', 'rejete'],
+  erreur:        ['importe', 'analyse'],
+};
+
+function isTransitionValide(ancien, nouveau) {
+  if (!ancien || !TRANSITIONS_VALIDES[ancien]) return true;
+  return TRANSITIONS_VALIDES[ancien].includes(nouveau);
+}
+
+// PATCH /api/candidats/:id — mise à jour partielle (statut, cotation, commentaire…)
+app.patch('/api/candidats/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { statut, cotationFinale, commentaireEvaluateur, motif } = req.body;
+    const auteurNom = req.body.auteurNom || req.authUser?.user_metadata?.prenom + ' ' + req.authUser?.user_metadata?.nom || 'Système';
+    const auteurId = req.body.auteurId || req.authUser?.id || 'system';
+
+    const candidat = await prisma.candidat.findUnique({ where: { id } });
+    if (!candidat) return res.status(404).json({ error: 'Candidat non trouvé' });
+
+    // Vérifier transition si changement de statut
+    if (statut && statut !== candidat.statut) {
+      if (!isTransitionValide(candidat.statut, statut)) {
+        return res.status(400).json({
+          error: `Transition invalide : ${candidat.statut} → ${statut}`,
+          transitionsPermises: TRANSITIONS_VALIDES[candidat.statut] || [],
+        });
+      }
+    }
+
+    const dataUpdate = {};
+    if (statut) dataUpdate.statut = statut;
+    if (cotationFinale !== undefined) dataUpdate.cotationFinale = cotationFinale;
+    if (commentaireEvaluateur !== undefined) dataUpdate.commentaireEvaluateur = commentaireEvaluateur;
+
+    const updated = await prisma.candidat.update({ where: { id }, data: dataUpdate });
+
+    // Historique du changement de statut
+    if (statut && statut !== candidat.statut) {
+      await prisma.historiqueStatut.create({
+        data: {
+          candidatId: id,
+          ancienStatut: candidat.statut,
+          nouveauStatut: statut,
+          motif: motif || null,
+          auteurId,
+          auteurNom,
+        }
+      });
+
+      // Journal d'activité
+      const typeJournal = statut === 'valide' ? 'validation'
+        : statut === 'rejete' ? 'rejet'
+        : statut === 'en_relecture' ? 'consultation'
+        : statut === 'liste_attente' ? 'liste_attente'
+        : 'note_modifiee';
+      await prisma.journalActivite.create({
+        data: {
+          candidatId: id,
+          type: typeJournal,
+          auteurId,
+          auteurNom,
+          description: `a changé le statut : ${candidat.statut} → ${statut}${motif ? ` (${motif})` : ''}`,
+          details: motif || null,
+        }
+      });
+    }
+
+    res.json(formatCandidat(await prisma.candidat.findUnique({
+      where: { id },
+      include: {
+        analyses: { orderBy: { dateAnalyse: 'desc' }, take: 1 },
+        validations: { orderBy: { dateValidation: 'desc' }, take: 1 },
+        oralAdmission: true,
+        brouillon: true,
+        evaluateursAssignes: true,
+        journalActivite: { orderBy: { date: 'desc' } },
+      }
+    })));
+  } catch (error) {
+    console.error('❌ Erreur API PATCH /candidats/:id:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du candidat' });
+  }
+});
+
+// POST /api/candidats/:id/validate — validation définitive
+app.post('/api/candidats/:id/validate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cotationFinale, commentaireEvaluateur, validateurNom } = req.body;
+    const auteurId = req.body.auteurId || req.authUser?.id || 'system';
+
+    const candidat = await prisma.candidat.findUnique({ where: { id } });
+    if (!candidat) return res.status(404).json({ error: 'Candidat non trouvé' });
+
+    // Vérifier que la transition est valide
+    if (!isTransitionValide(candidat.statut, 'valide')) {
+      return res.status(400).json({
+        error: `Impossible de valider depuis le statut "${candidat.statut}"`,
+        transitionsPermises: TRANSITIONS_VALIDES[candidat.statut] || [],
+      });
+    }
+
+    // Mettre à jour le candidat
+    await prisma.candidat.update({
+      where: { id },
+      data: {
+        statut: 'valide',
+        cotationFinale: cotationFinale || candidat.cotationIAProposee,
+        commentaireEvaluateur: commentaireEvaluateur || null,
+        validateurNom: validateurNom || 'Évaluateur',
+        dateValidation: new Date(),
+      }
+    });
+
+    // Créer l'entrée Validation
+    await prisma.validation.create({
+      data: {
+        candidatId: id,
+        statut: 'valide',
+        cotationFinale: cotationFinale || candidat.cotationIAProposee,
+        commentaire: commentaireEvaluateur || null,
+        validateurId: auteurId,
+        validateurNom: validateurNom || 'Évaluateur',
+        dateValidation: new Date(),
+      }
+    });
+
+    // Historique
+    await prisma.historiqueStatut.create({
+      data: {
+        candidatId: id,
+        ancienStatut: candidat.statut,
+        nouveauStatut: 'valide',
+        motif: 'Validation définitive',
+        auteurId,
+        auteurNom: validateurNom || 'Évaluateur',
+      }
+    });
+
+    // Journal
+    await prisma.journalActivite.create({
+      data: {
+        candidatId: id,
+        type: 'validation',
+        auteurId,
+        auteurNom: validateurNom || 'Évaluateur',
+        description: `a validé le dossier (cotation ${cotationFinale || candidat.cotationIAProposee}/8)`,
+        details: commentaireEvaluateur || null,
+      }
+    });
+
+    // Supprimer le brouillon si existant
+    await prisma.brouillonEvaluation.deleteMany({ where: { candidatId: id } });
+
+    const result = await prisma.candidat.findUnique({
+      where: { id },
+      include: {
+        analyses: { orderBy: { dateAnalyse: 'desc' }, take: 1 },
+        validations: { orderBy: { dateValidation: 'desc' }, take: 1 },
+        oralAdmission: true,
+        brouillon: true,
+        evaluateursAssignes: true,
+        journalActivite: { orderBy: { date: 'desc' } },
+      }
+    });
+
+    res.json(formatCandidat(result));
+  } catch (error) {
+    console.error('❌ Erreur API POST /candidats/:id/validate:', error);
+    res.status(500).json({ error: 'Erreur lors de la validation du candidat' });
+  }
+});
+
+// POST /api/candidats/:id/reject — rejet du dossier
+app.post('/api/candidats/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { motif, auteurNom } = req.body;
+    const auteurId = req.body.auteurId || req.authUser?.id || 'system';
+
+    const candidat = await prisma.candidat.findUnique({ where: { id } });
+    if (!candidat) return res.status(404).json({ error: 'Candidat non trouvé' });
+
+    if (!isTransitionValide(candidat.statut, 'rejete')) {
+      return res.status(400).json({
+        error: `Impossible de rejeter depuis le statut "${candidat.statut}"`,
+        transitionsPermises: TRANSITIONS_VALIDES[candidat.statut] || [],
+      });
+    }
+
+    await prisma.candidat.update({
+      where: { id },
+      data: { statut: 'rejete', commentaireEvaluateur: motif || null }
+    });
+
+    await prisma.validation.create({
+      data: {
+        candidatId: id,
+        statut: 'rejete',
+        commentaire: motif || null,
+        validateurId: auteurId,
+        validateurNom: auteurNom || 'Évaluateur',
+        dateValidation: new Date(),
+      }
+    });
+
+    await prisma.historiqueStatut.create({
+      data: {
+        candidatId: id,
+        ancienStatut: candidat.statut,
+        nouveauStatut: 'rejete',
+        motif: motif || 'Rejet du dossier',
+        auteurId,
+        auteurNom: auteurNom || 'Évaluateur',
+      }
+    });
+
+    await prisma.journalActivite.create({
+      data: {
+        candidatId: id,
+        type: 'rejet',
+        auteurId,
+        auteurNom: auteurNom || 'Évaluateur',
+        description: `a rejeté le dossier${motif ? ` : ${motif}` : ''}`,
+        details: motif || null,
+      }
+    });
+
+    const result = await prisma.candidat.findUnique({
+      where: { id },
+      include: {
+        analyses: { orderBy: { dateAnalyse: 'desc' }, take: 1 },
+        validations: { orderBy: { dateValidation: 'desc' }, take: 1 },
+        oralAdmission: true,
+        brouillon: true,
+        evaluateursAssignes: true,
+        journalActivite: { orderBy: { date: 'desc' } },
+      }
+    });
+
+    res.json(formatCandidat(result));
+  } catch (error) {
+    console.error('❌ Erreur API POST /candidats/:id/reject:', error);
+    res.status(500).json({ error: 'Erreur lors du rejet du candidat' });
+  }
+});
+
+// POST /api/candidats/:id/relecture — passer en relecture
+app.post('/api/candidats/:id/relecture', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { auteurNom } = req.body;
+    const auteurId = req.body.auteurId || req.authUser?.id || 'system';
+
+    const candidat = await prisma.candidat.findUnique({ where: { id } });
+    if (!candidat) return res.status(404).json({ error: 'Candidat non trouvé' });
+
+    if (!isTransitionValide(candidat.statut, 'en_relecture')) {
+      return res.status(400).json({
+        error: `Impossible de passer en relecture depuis le statut "${candidat.statut}"`,
+        transitionsPermises: TRANSITIONS_VALIDES[candidat.statut] || [],
+      });
+    }
+
+    await prisma.candidat.update({
+      where: { id },
+      data: {
+        statut: 'en_relecture',
+        relecteurId: auteurId,
+        relecteurNom: auteurNom || 'Évaluateur',
+        dateRelecture: new Date(),
+      }
+    });
+
+    await prisma.historiqueStatut.create({
+      data: {
+        candidatId: id,
+        ancienStatut: candidat.statut,
+        nouveauStatut: 'en_relecture',
+        motif: 'Passage en relecture',
+        auteurId,
+        auteurNom: auteurNom || 'Évaluateur',
+      }
+    });
+
+    await prisma.journalActivite.create({
+      data: {
+        candidatId: id,
+        type: 'consultation',
+        auteurId,
+        auteurNom: auteurNom || 'Évaluateur',
+        description: 'a pris le dossier en relecture',
+      }
+    });
+
+    const result = await prisma.candidat.findUnique({
+      where: { id },
+      include: {
+        analyses: { orderBy: { dateAnalyse: 'desc' }, take: 1 },
+        validations: { orderBy: { dateValidation: 'desc' }, take: 1 },
+        oralAdmission: true,
+        brouillon: true,
+        evaluateursAssignes: true,
+        journalActivite: { orderBy: { date: 'desc' } },
+      }
+    });
+
+    res.json(formatCandidat(result));
+  } catch (error) {
+    console.error('❌ Erreur API POST /candidats/:id/relecture:', error);
+    res.status(500).json({ error: 'Erreur lors du passage en relecture' });
+  }
+});
+
+// POST /api/candidats/bulk-status — changement de statut en masse
+app.post('/api/candidats/bulk-status', async (req, res) => {
+  try {
+    const { ids, nouveauStatut, motif, auteurNom, auteurId: bodyAuteurId } = req.body;
+    const auteurId = bodyAuteurId || req.authUser?.id || 'system';
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Aucun ID fourni' });
+    }
+    if (!nouveauStatut) {
+      return res.status(400).json({ error: 'Nouveau statut requis' });
+    }
+
+    const candidats = await prisma.candidat.findMany({ where: { id: { in: ids } } });
+
+    let success = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const candidat of candidats) {
+      if (!isTransitionValide(candidat.statut, nouveauStatut)) {
+        skipped++;
+        errors.push({ id: candidat.id, nom: `${candidat.nom} ${candidat.prenom}`, raison: `${candidat.statut} → ${nouveauStatut} non autorisé` });
+        continue;
+      }
+
+      await prisma.candidat.update({
+        where: { id: candidat.id },
+        data: {
+          statut: nouveauStatut,
+          ...(nouveauStatut === 'valide' ? {
+            cotationFinale: candidat.cotationIAProposee,
+            validateurNom: auteurNom || 'Évaluateur',
+            dateValidation: new Date(),
+          } : {}),
+        }
+      });
+
+      await prisma.historiqueStatut.create({
+        data: {
+          candidatId: candidat.id,
+          ancienStatut: candidat.statut,
+          nouveauStatut,
+          motif: motif || 'Changement en masse',
+          auteurId,
+          auteurNom: auteurNom || 'Système',
+        }
+      });
+
+      await prisma.journalActivite.create({
+        data: {
+          candidatId: candidat.id,
+          type: nouveauStatut === 'valide' ? 'validation' : nouveauStatut === 'rejete' ? 'rejet' : 'note_modifiee',
+          auteurId,
+          auteurNom: auteurNom || 'Système',
+          description: `a changé le statut : ${candidat.statut} → ${nouveauStatut} (action groupée)`,
+          details: motif || null,
+        }
+      });
+
+      // Si validation en masse, créer l'entrée Validation et supprimer brouillon
+      if (nouveauStatut === 'valide') {
+        await prisma.validation.create({
+          data: {
+            candidatId: candidat.id,
+            statut: 'valide',
+            cotationFinale: candidat.cotationIAProposee,
+            validateurId: auteurId,
+            validateurNom: auteurNom || 'Évaluateur',
+            dateValidation: new Date(),
+          }
+        });
+        await prisma.brouillonEvaluation.deleteMany({ where: { candidatId: candidat.id } });
+      }
+
+      success++;
+    }
+
+    res.json({
+      success: true,
+      updated: success,
+      skipped,
+      errors,
+      message: `${success} candidat(s) mis à jour${skipped > 0 ? `, ${skipped} ignoré(s) (transition invalide)` : ''}`,
+    });
+  } catch (error) {
+    console.error('❌ Erreur API POST /candidats/bulk-status:', error);
+    res.status(500).json({ error: 'Erreur lors du changement de statut en masse' });
+  }
+});
+
+// GET /api/candidats/:id/transitions — retourne les transitions possibles
+app.get('/api/candidats/:id/transitions', async (req, res) => {
+  try {
+    const candidat = await prisma.candidat.findUnique({
+      where: { id: req.params.id },
+      select: { statut: true }
+    });
+    if (!candidat) return res.status(404).json({ error: 'Candidat non trouvé' });
+
+    res.json({
+      statut: candidat.statut,
+      transitionsPossibles: TRANSITIONS_VALIDES[candidat.statut] || [],
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -677,7 +1240,43 @@ function formatCandidat(c) {
     statut: c.statut,
     campagneId: c.campagneId,
     campagneLibelle: c.campagne?.libelle,
-    donneesParcoursup: c.donneesParcoursup ? JSON.parse(c.donneesParcoursup) : {}
+    donneesParcoursup: c.donneesParcoursup ? JSON.parse(c.donneesParcoursup) : {},
+
+    // Brouillon évaluateur
+    brouillon: c.brouillon ? {
+      cotation: c.brouillon.cotation,
+      noteParcoursScolaire: c.brouillon.noteParcoursScolaire,
+      noteExperiences: c.brouillon.noteExperiences,
+      noteMotivation: c.brouillon.noteMotivation,
+      commentaire: c.brouillon.commentaire,
+      dateSauvegarde: c.brouillon.dateSauvegarde || c.brouillon.updatedAt,
+      auteurId: c.brouillon.auteurId,
+      auteurNom: c.brouillon.auteurNom,
+    } : undefined,
+
+    // Évaluateurs assignés
+    evaluateursAssignes: (c.evaluateursAssignes || []).map(e => ({
+      id: e.evaluateurId,
+      nom: e.nom,
+      prenom: e.prenom,
+      role: e.role,
+      dateAssignation: e.dateAssignation,
+      aConsulte: e.aConsulte,
+      dateConsultation: e.dateConsultation,
+      aEvalue: e.aEvalue,
+      dateEvaluation: e.dateEvaluation,
+    })),
+
+    // Journal d'activité
+    journalActivite: (c.journalActivite || []).map(j => ({
+      id: j.id,
+      date: j.date,
+      type: j.type,
+      auteurId: j.auteurId,
+      auteurNom: j.auteurNom,
+      description: j.description,
+      details: j.details,
+    })),
   };
 }
 
@@ -763,7 +1362,7 @@ function extraireDonneesCompletesCJS(candidat, candidatBrut) {
   const notesObj = notesBacRaw.Notes || notesBacRaw;
   if (Array.isArray(notesObj)) {
     notesObj.forEach(n => {
-      const matiere = n.Matiere || n.LibelleMatiere || n.Nom || '';
+      const matiere = n.Matiere || n.LibelleMatiere || n.EpreuveLibelle || n.Nom || '';
       const noteVal = parserNote(n.Note || n.NoteEpreuve || n.Valeur);
       if (matiere && noteVal !== null) toutesNotes.push({ matiere, note: noteVal });
     });
@@ -1338,6 +1937,231 @@ function analyserCandidatSimple(candidat, notesBac) {
     justification: `Cotation basée sur la moyenne générale de ${moyenne.toFixed(1)}/20`
   };
 }
+
+// ==================== BROUILLON ÉVALUATION ====================
+
+// Sauvegarder/mettre à jour un brouillon
+app.post('/api/candidats/:candidatId/brouillon', async (req, res) => {
+  try {
+    const { candidatId } = req.params;
+    const { cotation, noteParcoursScolaire, noteExperiences, noteMotivation, commentaire, auteurId, auteurNom } = req.body;
+
+    const brouillon = await prisma.brouillonEvaluation.upsert({
+      where: { candidatId },
+      create: {
+        candidatId,
+        cotation: cotation || 0,
+        noteParcoursScolaire: noteParcoursScolaire ?? null,
+        noteExperiences: noteExperiences ?? null,
+        noteMotivation: noteMotivation ?? null,
+        commentaire: commentaire || '',
+        auteurId: auteurId || 'anonymous',
+        auteurNom: auteurNom || 'Anonyme',
+      },
+      update: {
+        cotation: cotation || 0,
+        noteParcoursScolaire: noteParcoursScolaire ?? null,
+        noteExperiences: noteExperiences ?? null,
+        noteMotivation: noteMotivation ?? null,
+        commentaire: commentaire || '',
+        auteurId: auteurId || 'anonymous',
+        auteurNom: auteurNom || 'Anonyme',
+      },
+    });
+
+    // Ajouter une entrée au journal
+    const details = `Parcours: ${noteParcoursScolaire ?? '-'}/3, Expériences: ${noteExperiences ?? '-'}/3, Motivation: ${noteMotivation ?? '-'}/2 = ${cotation || 0}/8${commentaire ? `\nCommentaire: ${commentaire}` : ''}`;
+    await prisma.journalActivite.create({
+      data: {
+        candidatId,
+        type: 'brouillon',
+        auteurId: auteurId || 'anonymous',
+        auteurNom: auteurNom || 'Anonyme',
+        description: `a sauvegardé un brouillon (cotation ${cotation || 0}/8)`,
+        details,
+      }
+    });
+
+    res.json(brouillon);
+  } catch (error) {
+    console.error('❌ Erreur API POST /brouillon:', error);
+    res.status(500).json({ error: 'Erreur lors de la sauvegarde du brouillon' });
+  }
+});
+
+// Supprimer un brouillon
+app.delete('/api/candidats/:candidatId/brouillon', async (req, res) => {
+  try {
+    await prisma.brouillonEvaluation.deleteMany({
+      where: { candidatId: req.params.candidatId }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur API DELETE /brouillon:', error);
+    res.status(500).json({ error: 'Erreur lors de la suppression du brouillon' });
+  }
+});
+
+// ==================== ÉVALUATEURS ASSIGNÉS ====================
+
+// Assigner un évaluateur à un candidat
+app.post('/api/candidats/:candidatId/evaluateurs', async (req, res) => {
+  try {
+    const { candidatId } = req.params;
+    const { evaluateurId, nom, prenom, role } = req.body;
+
+    // Vérifier s'il n'est pas déjà assigné
+    const existing = await prisma.evaluateurAssigne.findFirst({
+      where: { candidatId, evaluateurId }
+    });
+    if (existing) {
+      return res.status(409).json({ error: 'Évaluateur déjà assigné' });
+    }
+
+    const evaluateur = await prisma.evaluateurAssigne.create({
+      data: {
+        candidatId,
+        evaluateurId,
+        nom,
+        prenom,
+        role: role || 'co-evaluateur',
+      }
+    });
+
+    // Ajouter au journal
+    await prisma.journalActivite.create({
+      data: {
+        candidatId,
+        type: 'assignation',
+        auteurId: evaluateurId,
+        auteurNom: `${prenom} ${nom}`,
+        description: `a été assigné comme ${role || 'co-evaluateur'}`,
+      }
+    });
+
+    res.json({
+      id: evaluateur.evaluateurId,
+      nom: evaluateur.nom,
+      prenom: evaluateur.prenom,
+      role: evaluateur.role,
+      dateAssignation: evaluateur.dateAssignation,
+      aConsulte: evaluateur.aConsulte,
+      dateConsultation: evaluateur.dateConsultation,
+      aEvalue: evaluateur.aEvalue,
+      dateEvaluation: evaluateur.dateEvaluation,
+    });
+  } catch (error) {
+    console.error('❌ Erreur API POST /evaluateurs:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'assignation' });
+  }
+});
+
+// Retirer un évaluateur
+app.delete('/api/candidats/:candidatId/evaluateurs/:evaluateurId', async (req, res) => {
+  try {
+    const { candidatId, evaluateurId } = req.params;
+
+    const evaluateur = await prisma.evaluateurAssigne.findFirst({
+      where: { candidatId, evaluateurId }
+    });
+
+    await prisma.evaluateurAssigne.deleteMany({
+      where: { candidatId, evaluateurId }
+    });
+
+    // Ajouter au journal
+    await prisma.journalActivite.create({
+      data: {
+        candidatId,
+        type: 'assignation',
+        auteurId: 'system',
+        auteurNom: 'Système',
+        description: `${evaluateur ? `${evaluateur.prenom} ${evaluateur.nom}` : 'Évaluateur'} a été retiré du dossier`,
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur API DELETE /evaluateurs:', error);
+    res.status(500).json({ error: 'Erreur lors du retrait' });
+  }
+});
+
+// Marquer consultation d'un évaluateur
+app.patch('/api/candidats/:candidatId/evaluateurs/:evaluateurId/consultation', async (req, res) => {
+  try {
+    const { candidatId, evaluateurId } = req.params;
+
+    await prisma.evaluateurAssigne.updateMany({
+      where: { candidatId, evaluateurId },
+      data: {
+        aConsulte: true,
+        dateConsultation: new Date(),
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erreur API PATCH /consultation:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour' });
+  }
+});
+
+// ==================== JOURNAL D'ACTIVITÉ ====================
+
+// Récupérer le journal d'un candidat
+app.get('/api/candidats/:candidatId/journal', async (req, res) => {
+  try {
+    const journal = await prisma.journalActivite.findMany({
+      where: { candidatId: req.params.candidatId },
+      orderBy: { date: 'desc' }
+    });
+    res.json(journal.map(j => ({
+      id: j.id,
+      date: j.date,
+      type: j.type,
+      auteurId: j.auteurId,
+      auteurNom: j.auteurNom,
+      description: j.description,
+      details: j.details,
+    })));
+  } catch (error) {
+    console.error('❌ Erreur API GET /journal:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération du journal' });
+  }
+});
+
+// Ajouter une entrée au journal
+app.post('/api/candidats/:candidatId/journal', async (req, res) => {
+  try {
+    const { candidatId } = req.params;
+    const { type, auteurId, auteurNom, description, details } = req.body;
+
+    const entree = await prisma.journalActivite.create({
+      data: {
+        candidatId,
+        type: type || 'commentaire',
+        auteurId: auteurId || 'anonymous',
+        auteurNom: auteurNom || 'Anonyme',
+        description: description || '',
+        details: details || null,
+      }
+    });
+
+    res.json({
+      id: entree.id,
+      date: entree.date,
+      type: entree.type,
+      auteurId: entree.auteurId,
+      auteurNom: entree.auteurNom,
+      description: entree.description,
+      details: entree.details,
+    });
+  } catch (error) {
+    console.error('❌ Erreur API POST /journal:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'ajout au journal' });
+  }
+});
 
 // ── Servir le frontend en production ──
 const distPath = path.join(__dirname, '..', 'dist');

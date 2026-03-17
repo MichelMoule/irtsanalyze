@@ -24,7 +24,7 @@ export function DatabaseStatus() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-sm text-shine-text-secondary animate-pulse">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-sm text-flat-text-secondary animate-pulse">
         <Database className="w-4 h-4" />
         <span>Verification...</span>
       </div>

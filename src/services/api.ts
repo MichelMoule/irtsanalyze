@@ -1,6 +1,22 @@
-import type { Candidat, Campagne, OralAdmission, StatutStats } from '@/types';
+import type { Candidat, Campagne, OralAdmission, StatutStats, BrouillonEvaluation, EvaluateurAssigne, EntreeJournal } from '@/types';
+import { supabase } from '@/lib/supabase';
 
-const API_URL = 'http://localhost:3003/api';
+const API_URL = import.meta.env.DEV ? 'http://localhost:3003/api' : '/api';
+
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> || {}),
+  };
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
+  // Add Content-Type for JSON if body is a string (not FormData)
+  if (options.body && typeof options.body === 'string') {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  }
+  return fetch(url, { ...options, headers });
+}
 
 export const api = {
   // Health check
@@ -11,7 +27,7 @@ export const api = {
 
   // Campagnes
   async getCampagnes(): Promise<Campagne[]> {
-    const response = await fetch(`${API_URL}/campagnes`);
+    const response = await authFetch(`${API_URL}/campagnes`);
     if (!response.ok) throw new Error('Failed to fetch campagnes');
     return response.json();
   },
@@ -23,9 +39,8 @@ export const api = {
     dateDebut?: string;
     dateFin?: string;
   }): Promise<Campagne> {
-    const response = await fetch(`${API_URL}/campagnes`, {
+    const response = await authFetch(`${API_URL}/campagnes`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to create campagne');
@@ -33,9 +48,8 @@ export const api = {
   },
 
   async updateCampagne(id: string, data: any): Promise<Campagne> {
-    const response = await fetch(`${API_URL}/campagnes/${id}`, {
+    const response = await authFetch(`${API_URL}/campagnes/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to update campagne');
@@ -47,7 +61,7 @@ export const api = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${API_URL}/import`, {
+    const response = await authFetch(`${API_URL}/import`, {
       method: 'POST',
       body: formData,
     });
@@ -61,9 +75,8 @@ export const api = {
   },
 
   async importCandidats(candidatsData: any[]): Promise<{ success: boolean; imported: number; skipped: number; errors: number; total: number; message: string }> {
-    const response = await fetch(`${API_URL}/import`, {
+    const response = await authFetch(`${API_URL}/import`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ candidatsData }),
     });
 
@@ -76,35 +89,61 @@ export const api = {
   },
 
   async getImportProgress(campagneId: string): Promise<{ total: number; analyzed: number; percentage: number }> {
-    const response = await fetch(`${API_URL}/import/progress/${campagneId}`);
+    const response = await authFetch(`${API_URL}/import/progress/${campagneId}`);
     if (!response.ok) throw new Error('Failed to get progress');
     return response.json();
   },
 
   // Candidats
   async getCandidats(): Promise<Candidat[]> {
-    const response = await fetch(`${API_URL}/candidats`);
+    const response = await authFetch(`${API_URL}/candidats`);
     if (!response.ok) throw new Error('Failed to fetch candidats');
     return response.json();
   },
 
   async getCandidat(id: string): Promise<Candidat> {
-    const response = await fetch(`${API_URL}/candidats/${id}`);
+    const response = await authFetch(`${API_URL}/candidats/${id}`);
     if (!response.ok) throw new Error('Failed to fetch candidat');
     return response.json();
   },
 
   async updateCandidat(
     id: string,
-    data: { cotationFinale?: number; commentaireEvaluateur?: string }
+    data: {
+      statut?: string;
+      cotationFinale?: number;
+      commentaireEvaluateur?: string;
+      motif?: string;
+      auteurNom?: string;
+      auteurId?: string;
+    }
   ): Promise<Candidat> {
-    const response = await fetch(`${API_URL}/candidats/${id}`, {
+    const response = await authFetch(`${API_URL}/candidats/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) throw new Error('Failed to update candidat');
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update candidat');
+    }
+    return response.json();
+  },
+
+  async deleteAllCandidats(): Promise<{ success: boolean; deleted: number; message: string }> {
+    const response = await authFetch(`${API_URL}/candidats`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete candidats');
+    return response.json();
+  },
+
+  async deleteCandidats(ids: string[]): Promise<{ success: boolean; deleted: number; message: string }> {
+    const response = await authFetch(`${API_URL}/candidats/delete`, {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+    if (!response.ok) throw new Error('Failed to delete candidats');
     return response.json();
   },
 
@@ -112,30 +151,97 @@ export const api = {
     id: string,
     data: {
       cotationFinale: number;
-      commentaireEvaluateur: string;
+      commentaireEvaluateur?: string;
       validateurNom: string;
+      auteurId?: string;
     }
   ): Promise<Candidat> {
-    const response = await fetch(`${API_URL}/candidats/${id}/validate`, {
+    const response = await authFetch(`${API_URL}/candidats/${id}/validate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) throw new Error('Failed to validate candidat');
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to validate candidat');
+    }
+    return response.json();
+  },
+
+  async rejectCandidat(
+    id: string,
+    data: {
+      motif?: string;
+      auteurNom: string;
+      auteurId?: string;
+    }
+  ): Promise<Candidat> {
+    const response = await authFetch(`${API_URL}/candidats/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to reject candidat');
+    }
+    return response.json();
+  },
+
+  async mettreEnRelecture(
+    id: string,
+    data: {
+      auteurNom: string;
+      auteurId?: string;
+    }
+  ): Promise<Candidat> {
+    const response = await authFetch(`${API_URL}/candidats/${id}/relecture`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to pass en relecture');
+    }
+    return response.json();
+  },
+
+  async bulkChangeStatus(data: {
+    ids: string[];
+    nouveauStatut: string;
+    motif?: string;
+    auteurNom: string;
+    auteurId?: string;
+  }): Promise<{ success: boolean; updated: number; skipped: number; errors: any[]; message: string }> {
+    const response = await authFetch(`${API_URL}/candidats/bulk-status`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to bulk change status');
+    }
+    return response.json();
+  },
+
+  async getTransitions(id: string): Promise<{ statut: string; transitionsPossibles: string[] }> {
+    const response = await authFetch(`${API_URL}/candidats/${id}/transitions`);
+    if (!response.ok) throw new Error('Failed to fetch transitions');
     return response.json();
   },
 
   // Stats
   async getStats(): Promise<StatutStats> {
-    const response = await fetch(`${API_URL}/stats`);
+    const response = await authFetch(`${API_URL}/stats`);
     if (!response.ok) throw new Error('Failed to fetch stats');
     return response.json();
   },
 
   // Commentaires
   async getCommentaires(candidatId: string): Promise<any[]> {
-    const response = await fetch(`${API_URL}/candidats/${candidatId}/commentaires`);
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/commentaires`);
     if (!response.ok) throw new Error('Failed to fetch commentaires');
     return response.json();
   },
@@ -145,9 +251,8 @@ export const api = {
     type?: string;
     auteurNom?: string;
   }): Promise<any> {
-    const response = await fetch(`${API_URL}/candidats/${candidatId}/commentaires`, {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/commentaires`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to add commentaire');
@@ -155,9 +260,8 @@ export const api = {
   },
 
   async updateCommentaire(commentaireId: string, contenu: string): Promise<any> {
-    const response = await fetch(`${API_URL}/commentaires/${commentaireId}`, {
+    const response = await authFetch(`${API_URL}/commentaires/${commentaireId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contenu }),
     });
     if (!response.ok) throw new Error('Failed to update commentaire');
@@ -165,7 +269,7 @@ export const api = {
   },
 
   async deleteCommentaire(commentaireId: string): Promise<void> {
-    const response = await fetch(`${API_URL}/commentaires/${commentaireId}`, {
+    const response = await authFetch(`${API_URL}/commentaires/${commentaireId}`, {
       method: 'DELETE',
     });
     if (!response.ok) throw new Error('Failed to delete commentaire');
@@ -173,15 +277,14 @@ export const api = {
 
   // Oral d'admission
   async getOralAdmission(candidatId: string): Promise<OralAdmission | null> {
-    const response = await fetch(`${API_URL}/candidats/${candidatId}/oral`);
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/oral`);
     if (!response.ok) throw new Error('Failed to fetch oral admission');
     return response.json();
   },
 
   async saveOralAdmission(candidatId: string, data: Omit<OralAdmission, 'id' | 'candidatId'>): Promise<OralAdmission> {
-    const response = await fetch(`${API_URL}/candidats/${candidatId}/oral`, {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/oral`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to save oral admission');
@@ -190,7 +293,7 @@ export const api = {
 
   // Historique des statuts
   async getHistoriqueStatuts(candidatId: string): Promise<any[]> {
-    const response = await fetch(`${API_URL}/candidats/${candidatId}/historique`);
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/historique`);
     if (!response.ok) throw new Error('Failed to fetch historique');
     return response.json();
   },
@@ -201,12 +304,87 @@ export const api = {
     motif?: string;
     auteurNom?: string;
   }): Promise<any> {
-    const response = await fetch(`${API_URL}/candidats/${candidatId}/historique`, {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/historique`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to add historique');
+    return response.json();
+  },
+
+  // Brouillon d'évaluation
+  async saveBrouillon(candidatId: string, data: {
+    cotation: number;
+    noteParcoursScolaire?: number;
+    noteExperiences?: number;
+    noteMotivation?: number;
+    commentaire: string;
+    auteurId: string;
+    auteurNom: string;
+  }): Promise<BrouillonEvaluation> {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/brouillon`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to save brouillon');
+    return response.json();
+  },
+
+  async deleteBrouillon(candidatId: string): Promise<void> {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/brouillon`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete brouillon');
+  },
+
+  // Évaluateurs assignés
+  async assignerEvaluateur(candidatId: string, data: {
+    evaluateurId: string;
+    nom: string;
+    prenom: string;
+    role: string;
+  }): Promise<EvaluateurAssigne> {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/evaluateurs`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to assign evaluateur');
+    return response.json();
+  },
+
+  async retirerEvaluateur(candidatId: string, evaluateurId: string): Promise<void> {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/evaluateurs/${evaluateurId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to remove evaluateur');
+  },
+
+  async marquerConsultation(candidatId: string, evaluateurId: string): Promise<void> {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/evaluateurs/${evaluateurId}/consultation`, {
+      method: 'PATCH',
+    });
+    if (!response.ok) throw new Error('Failed to mark consultation');
+  },
+
+  // Journal d'activité
+  async getJournal(candidatId: string): Promise<EntreeJournal[]> {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/journal`);
+    if (!response.ok) throw new Error('Failed to fetch journal');
+    return response.json();
+  },
+
+  async addJournalEntry(candidatId: string, data: {
+    type: string;
+    auteurId: string;
+    auteurNom: string;
+    description: string;
+    details?: string;
+  }): Promise<EntreeJournal> {
+    const response = await authFetch(`${API_URL}/candidats/${candidatId}/journal`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to add journal entry');
     return response.json();
   },
 };

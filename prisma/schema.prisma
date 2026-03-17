@@ -79,9 +79,15 @@ model Candidat {
   noteMotivation              Float?   // /2
   commentaireMotivation       String?
 
+  // Relecture
+  relecteurId           String?
+  relecteurNom          String?
+  dateRelecture         DateTime?
+
   // Validation et notation finale
   cotationFinale        Float?
   commentaireEvaluateur String?
+  validateurId          String?
   validateurNom         String?
   dateValidation        DateTime?
 
@@ -93,7 +99,7 @@ model Candidat {
   campagne              Campagne? @relation(fields: [campagneId], references: [id], onDelete: Cascade)
 
   // Workflow
-  statut                String   @default("importe") // importe, en_analyse_ia, analyse, en_relecture, valide, erreur
+  statut                String   @default("importe") // importe, en_analyse_ia, analyse, en_relecture, valide, rejete, liste_attente, erreur
   dateImport            DateTime @default(now())
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -104,6 +110,9 @@ model Candidat {
   commentaires          Commentaire[]
   historiqueStatuts     HistoriqueStatut[]
   oralAdmission         OralAdmission?
+  brouillon             BrouillonEvaluation?
+  evaluateursAssignes   EvaluateurAssigne[]
+  journalActivite       JournalActivite[]
 
   @@map("candidats")
   @@index([campagneId])
@@ -262,4 +271,75 @@ model HistoriqueStatut {
   candidat        Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
 
   @@map("historique_statuts")
+}
+
+// Brouillon d'évaluation (sauvé sans valider)
+model BrouillonEvaluation {
+  id                    String   @id @default(cuid())
+  candidatId            String   @unique
+
+  // Notes par critère
+  cotation              Float    @default(0)
+  noteParcoursScolaire  Float?
+  noteExperiences       Float?
+  noteMotivation        Float?
+  commentaire           String   @default("")
+
+  // Traçabilité
+  auteurId              String
+  auteurNom             String
+  dateSauvegarde        DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  candidat              Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
+
+  @@map("brouillons_evaluation")
+}
+
+// Évaluateur assigné à un dossier candidat
+model EvaluateurAssigne {
+  id                String   @id @default(cuid())
+  candidatId        String
+
+  // Infos évaluateur
+  evaluateurId      String   // ID de l'évaluateur (pas FK pour flexibilité mock)
+  nom               String
+  prenom            String
+  role              String   @default("co-evaluateur") // referent, co-evaluateur, observateur
+
+  // Suivi
+  dateAssignation   DateTime @default(now())
+  aConsulte         Boolean  @default(false)
+  dateConsultation  DateTime?
+  aEvalue           Boolean  @default(false)
+  dateEvaluation    DateTime?
+
+  // Relations
+  candidat          Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
+
+  @@unique([candidatId, evaluateurId])
+  @@map("evaluateurs_assignes")
+}
+
+// Journal d'activité sur un dossier candidat
+model JournalActivite {
+  id            String   @id @default(cuid())
+  candidatId    String
+
+  // Contenu
+  type          String   // import, analyse_ia, consultation, brouillon, note_modifiee, commentaire, assignation, validation, rejet, liste_attente, oral
+  auteurId      String
+  auteurNom     String
+  description   String
+  details       String?  // Contenu détaillé (notes, commentaires complets)
+
+  // Traçabilité
+  date          DateTime @default(now())
+
+  // Relations
+  candidat      Candidat @relation(fields: [candidatId], references: [id], onDelete: Cascade)
+
+  @@map("journal_activite")
+  @@index([candidatId])
 }

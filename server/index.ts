@@ -307,6 +307,35 @@ app.post('/api/candidats/:id/validate', async (req, res) => {
   }
 });
 
+// Delete all candidats (keeps campagnes)
+app.delete('/api/candidats', async (req, res) => {
+  try {
+    const count = await prisma.candidat.count();
+    await prisma.candidat.deleteMany();
+    res.json({ success: true, deleted: count, message: `${count} candidat(s) supprimé(s)` });
+  } catch (error) {
+    console.error('Error deleting candidats:', error);
+    res.status(500).json({ error: 'Failed to delete candidats' });
+  }
+});
+
+// Delete specific candidats by IDs
+app.post('/api/candidats/delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No IDs provided' });
+    }
+    const result = await prisma.candidat.deleteMany({
+      where: { id: { in: ids } },
+    });
+    res.json({ success: true, deleted: result.count, message: `${result.count} candidat(s) supprimé(s)` });
+  } catch (error) {
+    console.error('Error deleting candidats:', error);
+    res.status(500).json({ error: 'Failed to delete candidats' });
+  }
+});
+
 // Reset database (development only)
 app.delete('/api/reset', async (req, res) => {
   try {

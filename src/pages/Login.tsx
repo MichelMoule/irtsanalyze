@@ -9,12 +9,12 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary via-primary-light to-primary-dark flex items-center justify-center p-4">
+    <div className="min-h-screen bg-primary-500 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="bg-surface rounded-lg shadow-2xl p-8 md:p-12 max-w-md w-full"
+        className="bg-surface rounded-lg border border-gray-200 p-8 md:p-12 max-w-md w-full"
       >
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
@@ -22,7 +22,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-            className="bg-primary p-4 rounded-2xl mb-4"
+            className="bg-primary p-4 rounded-lg mb-4"
           >
             <GraduationCap className="w-12 h-12 text-white" />
           </motion.div>

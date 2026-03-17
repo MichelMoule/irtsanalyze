@@ -9,81 +9,81 @@ export function InfoPersonnelles({ candidat }: InfoPersonnellesProps) {
   const donneesCandidat = donneesParcoursup.DonneesCandidats || {};
 
   return (
-    <div className="bg-white rounded-xl border border-shine-border p-6">
-      <h3 className="text-sm font-semibold text-shine-text-primary mb-4 flex items-center gap-2">
+    <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <h3 className="text-sm font-semibold text-flat-fg mb-4 flex items-center gap-2">
         <User className="w-4 h-4 text-primary-500" />
         Informations Personnelles
       </h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="space-y-1">
-          <label className="text-xs font-medium text-shine-text-secondary">Numero de dossier</label>
-          <p className="text-sm text-shine-text-primary font-mono">{candidat.numeroDossier}</p>
+          <label className="text-xs font-medium text-flat-text-secondary">Numero de dossier</label>
+          <p className="text-sm text-flat-fg font-mono">{candidat.numeroDossier}</p>
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-medium text-shine-text-secondary">Nom complet</label>
-          <p className="text-sm text-shine-text-primary font-semibold">
+          <label className="text-xs font-medium text-flat-text-secondary">Nom complet</label>
+          <p className="text-sm text-flat-fg font-semibold">
             {candidat.nom} {candidat.prenom}
           </p>
           {donneesCandidat.PrenomDeuxCandidat && (
-            <p className="text-xs text-shine-text-secondary">
+            <p className="text-xs text-flat-text-secondary">
               {donneesCandidat.PrenomDeuxCandidat} {donneesCandidat.PrenomTroisCandidat}
             </p>
           )}
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-medium text-shine-text-secondary">Date de naissance</label>
-          <p className="text-sm text-shine-text-primary flex items-center gap-1">
+          <label className="text-xs font-medium text-flat-text-secondary">Date de naissance</label>
+          <p className="text-sm text-flat-fg flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" />
             {candidat.dateNaissance || 'Non renseignee'}
           </p>
           {candidat.dateNaissance && (
-            <p className="text-xs text-shine-text-secondary">
+            <p className="text-xs text-flat-text-secondary">
               Age: {calculerAge(candidat.dateNaissance)} ans
             </p>
           )}
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-medium text-shine-text-secondary">Email</label>
-          <p className="text-sm text-shine-text-primary flex items-center gap-1">
+          <label className="text-xs font-medium text-flat-text-secondary">Email</label>
+          <p className="text-sm text-flat-fg flex items-center gap-1">
             <Mail className="w-3.5 h-3.5" />
             {candidat.email || 'Non renseigne'}
           </p>
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-medium text-shine-text-secondary">Telephone</label>
-          <p className="text-sm text-shine-text-primary flex items-center gap-1">
+          <label className="text-xs font-medium text-flat-text-secondary">Telephone</label>
+          <p className="text-sm text-flat-fg flex items-center gap-1">
             <Phone className="w-3.5 h-3.5" />
             {candidat.telephone || 'Non renseigne'}
           </p>
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-medium text-shine-text-secondary">Adresse</label>
-          <p className="text-sm text-shine-text-primary flex items-center gap-1">
+          <label className="text-xs font-medium text-flat-text-secondary">Adresse</label>
+          <p className="text-sm text-flat-fg flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5" />
             {formatAdresse(donneesCandidat)}
           </p>
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-medium text-shine-text-secondary">Civilite</label>
-          <p className="text-sm text-shine-text-primary">{donneesCandidat.Civilite || 'Non renseignee'}</p>
+          <label className="text-xs font-medium text-flat-text-secondary">Civilite</label>
+          <p className="text-sm text-flat-fg">{donneesCandidat.Civilite || 'Non renseignee'}</p>
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-medium text-shine-text-secondary">Nationalite</label>
-          <p className="text-sm text-shine-text-primary">{donneesCandidat.TypeNationalite || 'Non renseignee'}</p>
+          <label className="text-xs font-medium text-flat-text-secondary">Nationalite</label>
+          <p className="text-sm text-flat-fg">{donneesCandidat.TypeNationalite || 'Non renseignee'}</p>
         </div>
 
         {donneesCandidat.INECandidat && (
           <div className="space-y-1">
-            <label className="text-xs font-medium text-shine-text-secondary">INE</label>
-            <p className="text-sm text-shine-text-primary font-mono text-xs">{donneesCandidat.INECandidat}</p>
+            <label className="text-xs font-medium text-flat-text-secondary">INE</label>
+            <p className="text-sm text-flat-fg font-mono text-xs">{donneesCandidat.INECandidat}</p>
           </div>
         )}
       </div>

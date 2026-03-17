@@ -49,7 +49,7 @@ export interface Candidat {
   oralAdmission?: OralAdmission;
 
   // Workflow
-  statut: 'importe' | 'en_analyse_ia' | 'analyse' | 'en_relecture' | 'valide' | 'erreur';
+  statut: 'importe' | 'en_analyse_ia' | 'analyse' | 'en_relecture' | 'valide' | 'rejete' | 'liste_attente' | 'erreur';
 
   // Traçabilité
   relecteurId?: string;
@@ -60,8 +60,56 @@ export interface Candidat {
   dateValidation?: string;
   commentaireEvaluateur?: string;
 
+  // Brouillon évaluateur (sauvegarde sans validation)
+  brouillon?: BrouillonEvaluation;
+
+  // Suivi des évaluateurs assignés
+  evaluateursAssignes?: EvaluateurAssigne[];
+
+  // Journal d'activité
+  journalActivite?: EntreeJournal[];
+
   // Données brutes Parcoursup
   donneesParcoursup?: any;
+}
+
+// Brouillon d'évaluation (sauvé sans valider)
+export interface BrouillonEvaluation {
+  cotation: number;
+  noteParcoursScolaire?: number;
+  noteExperiences?: number;
+  noteMotivation?: number;
+  commentaire: string;
+  dateSauvegarde: string;
+  auteurId: string;
+  auteurNom: string;
+  auteurAvatar?: string;
+}
+
+// Évaluateur assigné à un dossier
+export interface EvaluateurAssigne {
+  id: string;
+  nom: string;
+  prenom: string;
+  avatar?: string;
+  role: 'referent' | 'co-evaluateur' | 'observateur';
+  dateAssignation: string;
+  aConsulte: boolean;
+  dateConsultation?: string;
+  aEvalue: boolean;
+  dateEvaluation?: string;
+}
+
+// Entrée du journal d'activité
+export interface EntreeJournal {
+  id: string;
+  date: string;
+  type: 'import' | 'analyse_ia' | 'consultation' | 'brouillon' | 'note_modifiee' | 'commentaire' | 'assignation' | 'validation' | 'rejet' | 'liste_attente' | 'oral';
+  auteurId: string;
+  auteurNom: string;
+  auteurAvatar?: string;
+  description: string;
+  details?: string;
 }
 
 // Résultat d'évaluation d'un critère IA
@@ -140,6 +188,11 @@ export interface Filtres {
   recherche: string;
   statuts: string[];
   alertesUniquement: boolean;
+  campagneId?: string;
+  filiere?: string;
+  scoreMin?: number;
+  scoreMax?: number;
+  serieBac?: string;
 }
 
 export interface ConfigurationAnalyse {

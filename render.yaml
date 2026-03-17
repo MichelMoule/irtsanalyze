@@ -1,13 +1,23 @@
 services:
   - type: web
-    name: irts-parcoursup-analyzer
+    name: irts-parcoursup
     runtime: node
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    region: frankfurt
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build:front
+    startCommand: node server/api-simple.cjs
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
         sync: false
-      - key: NODE_ENV
-        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false

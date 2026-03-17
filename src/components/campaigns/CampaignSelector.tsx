@@ -50,18 +50,18 @@ export function CampaignSelector({ onCampaignChange }: CampaignSelectorProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 px-4 py-2 bg-white border border-shine-border rounded-lg">
-        <Calendar className="w-4 h-4 text-shine-text-tertiary" />
-        <span className="text-sm text-shine-text-secondary">Chargement...</span>
+      <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg">
+        <Calendar className="w-4 h-4 text-flat-text-tertiary" />
+        <span className="text-sm text-flat-text-secondary">Chargement...</span>
       </div>
     );
   }
 
   if (campagnes.length === 0) {
     return (
-      <div className="flex items-center gap-2 px-4 py-2 bg-white border border-shine-border rounded-lg">
-        <Calendar className="w-4 h-4 text-shine-text-tertiary" />
-        <span className="text-sm text-shine-text-secondary">Aucune campagne</span>
+      <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg">
+        <Calendar className="w-4 h-4 text-flat-text-tertiary" />
+        <span className="text-sm text-flat-text-secondary">Aucune campagne</span>
       </div>
     );
   }
@@ -70,18 +70,18 @@ export function CampaignSelector({ onCampaignChange }: CampaignSelectorProps) {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 px-4 py-2 bg-white border border-shine-border rounded-lg hover:border-primary-300 transition-colors min-w-[280px]"
+        className="flex items-center gap-3 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:border-primary-300 transition-colors min-w-[280px]"
       >
         <Calendar className="w-4 h-4 text-primary-500 flex-shrink-0" />
         <div className="flex-1 text-left">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-shine-text-primary">
+            <span className="text-sm font-medium text-flat-fg">
               {currentCampagne?.nom || currentCampagne?.libelle || 'Selectionner une campagne'}
             </span>
             {currentCampagne && getStatutBadge(currentCampagne.statut)}
           </div>
         </div>
-        <ChevronDown className={`w-4 h-4 text-shine-text-tertiary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-flat-text-tertiary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       <AnimatePresence>
@@ -96,7 +96,7 @@ export function CampaignSelector({ onCampaignChange }: CampaignSelectorProps) {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="absolute top-full left-0 mt-2 w-full bg-white border border-shine-border rounded-lg shadow-dropdown z-50 overflow-hidden"
+              className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-200 rounded-lg z-50 overflow-hidden"
             >
               <div className="max-h-96 overflow-y-auto">
                 {campagnes.map((campagne) => (
@@ -105,13 +105,13 @@ export function CampaignSelector({ onCampaignChange }: CampaignSelectorProps) {
                     onClick={() => handleSelectCampagne(campagne)}
                     className={`
                       w-full px-4 py-3 text-left
-                      hover:bg-shine-hover-bg transition-colors
-                      border-b border-shine-border last:border-b-0
+                      hover:bg-gray-100 transition-colors
+                      border-b border-gray-200 last:border-b-0
                       ${currentCampagne?.id === campagne.id ? 'bg-primary-50' : ''}
                     `}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-shine-text-primary">
+                      <span className="text-sm font-medium text-flat-fg">
                         {campagne.nom || campagne.libelle}
                       </span>
                       {getStatutBadge(campagne.statut)}
@@ -125,7 +125,7 @@ export function CampaignSelector({ onCampaignChange }: CampaignSelectorProps) {
                   setIsOpen(false);
                   setShowCreateModal(true);
                 }}
-                className="w-full px-4 py-3 text-left bg-shine-bg hover:bg-shine-hover-bg transition-colors border-t border-shine-border flex items-center gap-2 text-primary-500 font-medium text-sm"
+                className="w-full px-4 py-3 text-left bg-gray-100 hover:bg-gray-100 transition-colors border-t border-gray-200 flex items-center gap-2 text-primary-500 font-medium text-sm"
               >
                 <Plus className="w-4 h-4" />
                 Creer une nouvelle campagne

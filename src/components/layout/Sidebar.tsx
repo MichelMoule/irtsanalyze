@@ -38,17 +38,17 @@ export function Sidebar({ onImportClick, onExportClick, isMobileOpen, onMobileCl
 
   const sections: NavSection[] = [
     {
-      title: 'ADMISSIONS',
+      title: 'Admissions',
       items: [
         { icon: Users, label: 'Candidatures', path: '/dashboard' },
+        { icon: Calendar, label: 'Campagnes', path: '/campagnes' },
       ],
     },
     {
-      title: 'GESTION',
+      title: 'Outils',
       items: [
-        { icon: Calendar, label: 'Campagnes', path: '/campagnes' },
-        { icon: Upload, label: 'Import', onClick: onImportClick },
-        { icon: Download, label: 'Export', onClick: onExportClick },
+        { icon: Upload, label: 'Importer', onClick: onImportClick },
+        { icon: Download, label: 'Exporter', onClick: onExportClick },
       ],
     },
   ];
@@ -81,64 +81,39 @@ export function Sidebar({ onImportClick, onExportClick, isMobileOpen, onMobileCl
   };
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-white border-r border-shine-border">
-      {/* Logo + User */}
-      <div className="px-5 pt-6 pb-4">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center">
-            <GraduationCap className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-shine-text-primary">IRTS</p>
-            <p className="text-xs text-shine-text-tertiary">Espace Admissions</p>
-          </div>
-        </div>
+    <div className="flex flex-col h-full bg-gray-100">
 
-        {user && (
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-shine-hover-bg">
-            <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-              {user.prenom?.[0]}{user.nom?.[0]}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-shine-text-primary truncate">
-                {user.prenom} {user.nom}
-              </p>
-              <p className="text-xs text-shine-text-tertiary truncate">
-                {user.role || 'Evaluateur'}
-              </p>
-            </div>
-          </div>
-        )}
+      {/* Brand Header */}
+      <div className="flex items-center gap-3 px-4 h-16 flex-shrink-0">
+        <div className="w-8 h-8 bg-primary-500 rounded-md flex items-center justify-center flex-shrink-0">
+          <GraduationCap className="w-4 h-4 text-white" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-base font-extrabold text-flat-fg leading-none tracking-tight">IRTS</p>
+          <p className="text-[11px] text-flat-text-tertiary font-medium leading-none mt-0.5 uppercase tracking-wider">Admissions</p>
+        </div>
       </div>
 
-      <div className="h-px bg-shine-border mx-5" />
-
-      {/* Navigation sections */}
-      <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
         {sections.map((section) => (
           <div key={section.title}>
-            <p className="px-3 mb-2 text-[11px] font-semibold text-shine-text-section uppercase tracking-widest">
+            <p className="section-label px-3 mb-2">
               {section.title}
             </p>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.path);
                 return (
                   <button
                     key={item.label}
+                    type="button"
                     onClick={() => handleNavClick(item)}
-                    className={`
-                      w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                      transition-colors duration-150
-                      ${active
-                        ? 'bg-primary-50 text-primary-500'
-                        : 'text-shine-text-secondary hover:bg-shine-hover-bg hover:text-shine-text-primary'
-                      }
-                    `}
+                    className={`nav-item ${active ? 'nav-item-active' : 'nav-item-default'}`}
                   >
-                    <Icon className="w-[18px] h-[18px]" />
-                    {item.label}
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-white' : 'text-flat-text-tertiary'}`} />
+                    <span className="flex-1 text-left">{item.label}</span>
                   </button>
                 );
               })}
@@ -147,37 +122,56 @@ export function Sidebar({ onImportClick, onExportClick, isMobileOpen, onMobileCl
         ))}
       </nav>
 
-      {/* Bottom section */}
-      <div className="border-t border-shine-border px-3 py-3 space-y-0.5">
-        {bottomItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.path);
-          return (
-            <button
-              key={item.label}
-              onClick={() => handleNavClick(item)}
-              className={`
-                w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                transition-colors duration-150
-                ${active
-                  ? 'bg-primary-50 text-primary-500'
-                  : 'text-shine-text-secondary hover:bg-shine-hover-bg hover:text-shine-text-primary'
-                }
-              `}
+      {/* Bottom Section */}
+      <div className="flex-shrink-0">
+        {/* User Profile */}
+        {user && (
+          <div className="px-3 py-3">
+            <div
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-gray-200 transition-all duration-200 cursor-pointer"
+              onClick={() => { navigate('/profile'); onMobileClose?.(); }}
             >
-              <Icon className="w-[18px] h-[18px]" />
-              {item.label}
-            </button>
-          );
-        })}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                     text-red-500 hover:bg-red-50 transition-colors duration-150"
-        >
-          <LogOut className="w-[18px] h-[18px]" />
-          Deconnexion
-        </button>
+              <div className="w-8 h-8 bg-primary-500 rounded-md flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {user.prenom?.[0]}{user.nom?.[0]}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-flat-fg truncate leading-none">
+                  {user.prenom} {user.nom}
+                </p>
+                <p className="text-[11px] text-flat-text-tertiary truncate mt-0.5 leading-none font-medium">
+                  {user.role || 'Evaluateur'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Nav Items */}
+        <div className="px-3 py-3 space-y-1">
+          {bottomItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.path);
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => handleNavClick(item)}
+                className={`nav-item ${active ? 'nav-item-active' : 'nav-item-default'}`}
+              >
+                <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-white' : 'text-flat-text-tertiary'}`} />
+                <span className="flex-1 text-left">{item.label}</span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="nav-item w-full text-red-500 hover:bg-red-100 hover:text-red-600"
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            <span>Deconnexion</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -185,7 +179,7 @@ export function Sidebar({ onImportClick, onExportClick, isMobileOpen, onMobileCl
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:block fixed left-0 top-0 bottom-0 w-[250px] z-30">
+      <aside className="hidden lg:block fixed left-0 top-0 bottom-0 w-[var(--sidebar-width,240px)] z-30">
         {sidebarContent}
       </aside>
 
@@ -193,16 +187,18 @@ export function Sidebar({ onImportClick, onExportClick, isMobileOpen, onMobileCl
       {isMobileOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div
-            className="absolute inset-0 bg-black/30"
+            className="absolute inset-0 bg-black/40"
             onClick={onMobileClose}
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-[280px] animate-slide-in-left">
-            <div className="absolute top-4 right-4 z-10">
+          <aside className="absolute left-0 top-0 bottom-0 w-[260px] animate-slide-in-left">
+            <div className="absolute top-3 right-3 z-10">
               <button
+                type="button"
                 onClick={onMobileClose}
-                className="p-1.5 rounded-lg hover:bg-shine-hover-bg text-shine-text-secondary"
+                className="p-1.5 rounded-md hover:bg-gray-200 text-flat-text-secondary transition-all duration-200"
+                aria-label="Fermer le menu"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
             {sidebarContent}

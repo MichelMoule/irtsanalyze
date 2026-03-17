@@ -1,34 +1,35 @@
 interface ScoreBadgeProps {
   score: number;
   maxScore?: number;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export function ScoreBadge({ score, maxScore = 8, size = 'sm' }: ScoreBadgeProps) {
   const percentage = (score / maxScore) * 100;
 
   const getColorClass = () => {
-    if (percentage >= 75) return 'bg-emerald-50 text-emerald-600 border-emerald-200';
-    if (percentage >= 50) return 'bg-amber-50 text-amber-600 border-amber-200';
-    return 'bg-red-50 text-red-600 border-red-200';
+    if (percentage >= 75) return 'bg-emerald-100 text-emerald-700';
+    if (percentage >= 50) return 'bg-amber-100 text-amber-700';
+    if (percentage > 0) return 'bg-red-100 text-red-700';
+    return 'bg-gray-100 text-gray-500';
   };
 
   const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5',
-    md: 'text-sm px-3 py-1',
+    sm: 'text-xs px-2.5 py-1',
+    md: 'text-sm px-3 py-1.5',
+    lg: 'text-base px-4 py-2',
   };
 
   return (
     <span
       className={`
-        inline-flex items-center gap-1
-        font-semibold rounded-full border
+        inline-flex items-center gap-1.5
+        font-bold rounded-md
         ${getColorClass()}
         ${sizeClasses[size]}
       `}
     >
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {score.toFixed(1)}/{maxScore}
+      {score.toFixed(1)}<span className="font-medium opacity-60">/{maxScore}</span>
     </span>
   );
 }

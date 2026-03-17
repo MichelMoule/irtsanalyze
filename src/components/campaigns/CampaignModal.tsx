@@ -67,18 +67,18 @@ export function CampaignModal({ isOpen, onClose, onSubmit, campaign }: CampaignM
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="relative w-full max-w-lg bg-white rounded-xl border border-shine-border shadow-dropdown max-h-[90vh] overflow-y-auto"
+          className="relative w-full max-w-lg bg-white rounded-lg border border-gray-200 max-h-[90vh] overflow-y-auto"
         >
-          <div className="sticky top-0 bg-white border-b border-shine-border px-6 py-4 flex items-center justify-between rounded-t-xl">
-            <h2 className="text-base font-semibold text-shine-text-primary">
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-xl">
+            <h2 className="text-base font-semibold text-flat-fg">
               {campaign ? 'Modifier la campagne' : 'Nouvelle campagne'}
             </h2>
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-shine-hover-bg rounded-lg transition-colors"
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
               title="Fermer"
             >
-              <X className="w-4 h-4 text-shine-text-secondary" />
+              <X className="w-4 h-4 text-flat-text-secondary" />
             </button>
           </div>
 
@@ -90,7 +90,7 @@ export function CampaignModal({ isOpen, onClose, onSubmit, campaign }: CampaignM
             )}
 
             <div>
-              <label className="block text-sm font-medium text-shine-text-primary mb-1.5">
+              <label className="block text-sm font-medium text-flat-fg mb-1.5">
                 <FileText className="w-3.5 h-3.5 inline mr-1.5" />
                 Nom de la campagne *
               </label>
@@ -105,7 +105,7 @@ export function CampaignModal({ isOpen, onClose, onSubmit, campaign }: CampaignM
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-shine-text-primary mb-1.5">
+              <label className="block text-sm font-medium text-flat-fg mb-1.5">
                 <Hash className="w-3.5 h-3.5 inline mr-1.5" />
                 Annee *
               </label>
@@ -121,7 +121,7 @@ export function CampaignModal({ isOpen, onClose, onSubmit, campaign }: CampaignM
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-shine-text-primary mb-1.5">
+              <label className="block text-sm font-medium text-flat-fg mb-1.5">
                 Description
               </label>
               <textarea
@@ -135,7 +135,7 @@ export function CampaignModal({ isOpen, onClose, onSubmit, campaign }: CampaignM
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-shine-text-primary mb-1.5">
+                <label className="block text-sm font-medium text-flat-fg mb-1.5">
                   <Calendar className="w-3.5 h-3.5 inline mr-1.5" />
                   Date de debut
                 </label>
@@ -148,7 +148,7 @@ export function CampaignModal({ isOpen, onClose, onSubmit, campaign }: CampaignM
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-shine-text-primary mb-1.5">
+                <label className="block text-sm font-medium text-flat-fg mb-1.5">
                   <Calendar className="w-3.5 h-3.5 inline mr-1.5" />
                   Date de fin
                 </label>

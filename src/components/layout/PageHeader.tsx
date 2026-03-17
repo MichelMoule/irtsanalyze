@@ -6,15 +6,15 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   return (
-    <div className="flex items-center justify-between px-8 py-5 bg-white border-b border-shine-border">
+    <div className="flex items-center justify-between px-6 lg:px-8 py-5 bg-gray-100">
       <div>
-        <h1 className="text-xl font-semibold text-shine-text-primary">{title}</h1>
+        <h1 className="text-xl font-extrabold text-flat-fg leading-tight tracking-tight">{title}</h1>
         {subtitle && (
-          <p className="text-sm text-shine-text-secondary mt-0.5">{subtitle}</p>
+          <p className="text-xs text-flat-text-tertiary mt-0.5 font-medium">{subtitle}</p>
         )}
       </div>
       {actions && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {actions}
         </div>
       )}

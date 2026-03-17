@@ -84,6 +84,8 @@ export interface Indicateur {
   disponible: boolean;
   valeur: string | number | boolean | null;
   interpretation: string;
+  /** Commentaire IA court — évaluation qualitative de l'indicateur */
+  commentaireIA: string;
 }
 
 export interface AnalyseDetailleeResult {
@@ -199,7 +201,7 @@ export class AnalyseurCandidatService {
     // Parser les notes depuis différents formats
     if (Array.isArray(notesObj)) {
       notesObj.forEach((n: any) => {
-        const matiere = n.Matiere || n.LibelleMatiere || n.Nom || '';
+        const matiere = n.Matiere || n.LibelleMatiere || n.EpreuveLibelle || n.Nom || '';
         const noteVal = this.parserNote(n.Note || n.NoteEpreuve || n.Valeur);
         if (matiere && noteVal !== null) {
           toutesNotes.push({ matiere, note: noteVal });
@@ -331,6 +333,11 @@ export class AnalyseurCandidatService {
         ? `Bac obtenu${d.bac.anneeObtention ? ` (${d.bac.anneeObtention})` : ''}`
         : d.bac.enCours ? 'En cours (terminale) — ne pas pénaliser'
         : d.bac.obtenu === false ? 'Bac non obtenu' : 'Non renseigné',
+      commentaireIA: d.bac.obtenu === true
+        ? `Diplôme N4 identifié : bac ${d.bac.type !== 'non renseigné' ? d.bac.type : ''} ${d.bac.serie ? `(${d.bac.serie})` : ''} obtenu${d.bac.anneeObtention ? ` en ${d.bac.anneeObtention}` : ''}. Prérequis validé pour l'entrée en formation travail social.`
+        : d.bac.enCours ? `Candidat en terminale${d.bac.serie ? ` (${d.bac.serie})` : ''} — bac en cours d'obtention. L'évaluation se fonde sur les éléments disponibles (bulletins, appréciations, dynamique). Ne pas pénaliser le statut "en cours".`
+        : d.bac.obtenu === false ? 'Bac non obtenu. Point de vigilance : l\'entrée en formation reste conditionnée à l\'obtention du bac ou d\'un diplôme équivalent de niveau 4. À contextualiser avec le reste du parcours.'
+        : 'Statut du bac non renseigné dans le dossier Parcoursup. L\'IA adapte son analyse aux autres éléments disponibles.',
     });
 
     // 2. TYPE_BAC
@@ -342,6 +349,10 @@ export class AnalyseurCandidatService {
         : d.bac.type === 'technologique' ? 'Bac technologique : compétences techniques, méthodologie appliquée'
         : d.bac.type === 'professionnel' ? 'Bac professionnel : compétences pratiques, expérience terrain'
         : 'Type de bac non renseigné',
+      commentaireIA: d.bac.type === 'général' ? `Bac général${d.bac.serie ? ` (${d.bac.serie})` : ''} : acquis en expression, analyse, argumentation. Nature des compétences mobilisées : rédaction structurée, esprit critique, culture générale — directement utiles pour les écrits professionnels et l'oral du travail social.`
+        : d.bac.type === 'technologique' ? `Bac technologique${d.bac.serie ? ` (${d.bac.serie})` : ''} : compétences techniques et méthodologie appliquée.${d.bac.serie.toLowerCase().includes('st2s') ? ' ST2S identifié : lien direct avec le champ sanitaire et social, acquis spécifiques en santé/accompagnement.' : ' Types de compétences : méthodologie projet, travail collaboratif.'}`
+        : d.bac.type === 'professionnel' ? `Bac professionnel${d.bac.serie ? ` (${d.bac.serie})` : ''} : compétences pratiques et expérience terrain. À valoriser si lien avec le secteur social ou contact public. Ce type de bac n'est pas un critère éliminatoire.`
+        : 'Type de bac non renseigné dans le dossier. L\'IA adapte son analyse aux autres indicateurs disponibles sans pénaliser l\'absence de cette information.',
     });
 
     // 3. SERIE_SPECIALITES
@@ -351,6 +362,14 @@ export class AnalyseurCandidatService {
       disponible: d.bac.serie !== '' && d.bac.serie !== 'Inconnue',
       valeur: d.bac.serie,
       interpretation: `${d.bac.serie}${d.bac.specialites.length > 0 ? ` (${d.bac.specialites.join(', ')})` : ''} — coloration ${coloration}`,
+      commentaireIA: (() => {
+        const spStr = d.bac.specialites.length > 0 ? ` — spécialités : ${d.bac.specialites.join(', ')}` : '';
+        if (coloration === 'sociale/sanitaire' || coloration === 'médico-sociale')
+          return `Filière ${d.bac.serie}${spStr}. Coloration ${coloration} donnant une approche santé/social/accompagnement directement pertinente pour la formation en travail social.`;
+        if (coloration === 'sciences humaines et sociales' || coloration === 'littéraire')
+          return `Filière ${d.bac.serie}${spStr}. Coloration ${coloration} : compétences en analyse, rédaction et culture générale utiles au TS.`;
+        return `Filière ${d.bac.serie}${spStr}. Coloration ${coloration} : pas de lien direct avec le champ social, mais un bac éloigné du social n'est pas pénalisant si les compétences transférables sont bonnes.`;
+      })(),
     });
 
     // 4. COHERENCE_TS
@@ -362,6 +381,11 @@ export class AnalyseurCandidatService {
       interpretation: coherenceTS === 'direct' ? 'Lien direct avec le travail social'
         : coherenceTS === 'neutre' ? 'Parcours neutre vis-à-vis du travail social (compétences transférables à évaluer)'
         : 'Parcours éloigné du champ social (sans disqualifier — compétences transférables à évaluer)',
+      commentaireIA: coherenceTS === 'direct'
+        ? `Le parcours ${d.bac.serie} est en lien direct avec le travail social. Les acquis disciplinaires sont directement mobilisables en formation (compréhension des publics, méthodologie d'accompagnement).`
+        : coherenceTS === 'neutre'
+        ? `Le parcours ${d.bac.serie} est neutre vis-à-vis du travail social : ni pénalisant ni bonifiant. L'IA évalue les compétences transférables (expression, analyse, rigueur) via les notes et appréciations.`
+        : `Le parcours ${d.bac.serie} est éloigné du champ social, mais cela ne constitue pas un facteur disqualifiant. Un bac éloigné n'est pas pénalisant si les compétences transférables sont bonnes (écrit, analyse, régularité).`,
     });
 
     // 5-10. NOTES PAR MATIÈRE
@@ -380,10 +404,20 @@ export class AnalyseurCandidatService {
         interpretation: note !== null
           ? `${label} : ${note}/20 — ${note >= 14 ? 'très bon niveau' : note >= 12 ? 'bon niveau' : note >= 10 ? 'niveau correct' : 'niveau fragile'} (${desc})`
           : `${label} : non renseigné dans le dossier`,
+        commentaireIA: (() => {
+          if (note === null) return `Note de ${label.toLowerCase()} non disponible dans le dossier. L'IA ne pénalise pas l'absence de cette donnée et s'appuie sur les autres indicateurs.`;
+          const bacCtx = d.bac.serie ? ` (bac ${d.bac.serie})` : '';
+          if (note >= 16) return `Excellent niveau en ${label.toLowerCase()} (${note}/20)${bacCtx}. Compétence ${desc} — acquis de haut niveau directement mobilisables pour les écrits professionnels et l'analyse de situations en travail social.`;
+          if (note >= 14) return `Très bon niveau en ${label.toLowerCase()} (${note}/20)${bacCtx}. Solides acquis en ${desc}. Ces compétences sont directement utiles pour la formation TS (rapports, synthèses, analyse).`;
+          if (note >= 12) return `Bon niveau en ${label.toLowerCase()} (${note}/20)${bacCtx}. Acquis satisfaisants en ${desc}. Base solide pour aborder les exigences rédactionnelles et analytiques de la formation.`;
+          if (note >= 10) return `Niveau correct en ${label.toLowerCase()} (${note}/20)${bacCtx}. Bases acquises en ${desc}, mais à consolider pour répondre aux exigences de la formation (écrits professionnels, analyse).`;
+          return `Niveau fragile en ${label.toLowerCase()} (${note}/20)${bacCtx}. Fragilité identifiée sur ${desc} — point de vigilance pour la capacité à produire des écrits professionnels structurés.`;
+        })(),
       });
     }
 
     // 9. MATIERES_SANITAIRE_SOCIALE
+    const st2sMoy = d.notesBac.st2s.length > 0 ? d.notesBac.st2s.reduce((s, n) => s + n.note, 0) / d.notesBac.st2s.length : 0;
     indicateurs.push({
       id: 'MATIERES_SANITAIRE_SOCIALE',
       disponible: d.notesBac.st2s.length > 0,
@@ -391,6 +425,12 @@ export class AnalyseurCandidatService {
       interpretation: d.notesBac.st2s.length > 0
         ? `Matières sanitaire/sociale : ${d.notesBac.st2s.map(n => `${n.matiere} (${n.note}/20)`).join(', ')} — pertinence pour approche santé/social`
         : 'Aucune matière sanitaire/sociale identifiée (non applicable ou non renseigné)',
+      commentaireIA: d.notesBac.st2s.length > 0
+        ? (st2sMoy >= 14 ? `Excellents résultats en matières sanitaire/sociale (moyenne ${st2sMoy.toFixed(1)}/20 : ${d.notesBac.st2s.map(n => `${n.matiere} ${n.note}/20`).join(', ')}). Acquis spécifiques en santé/accompagnement directement pertinents pour la formation TS.`
+          : st2sMoy >= 12 ? `Bons résultats en matières sanitaire/sociale (moyenne ${st2sMoy.toFixed(1)}/20 : ${d.notesBac.st2s.map(n => `${n.matiere} ${n.note}/20`).join(', ')}). Acquis pertinents pour l'approche santé/social/accompagnement.`
+          : `Matières sanitaire/sociale présentes (${d.notesBac.st2s.map(n => `${n.matiere} ${n.note}/20`).join(', ')}, moyenne ${st2sMoy.toFixed(1)}/20) mais résultats à consolider. Acquis partiels sur le champ sanitaire et social.`)
+        : d.bac.serie.toLowerCase().includes('st2s') ? 'Bac ST2S identifié mais notes détaillées non disponibles dans le dossier. Pas de pénalité.'
+        : 'Non applicable — bac hors filière sanitaire/sociale. L\'évaluation s\'appuie sur les autres indicateurs.',
     });
 
     // 11. MOYENNE_GENERALE
@@ -401,6 +441,17 @@ export class AnalyseurCandidatService {
       interpretation: d.notesBac.moyenneGenerale !== null
         ? `Moyenne générale : ${d.notesBac.moyenneGenerale}/20 — ${d.notesBac.moyenneGenerale >= 14 ? 'niveau très solide' : d.notesBac.moyenneGenerale >= 12 ? 'niveau satisfaisant' : d.notesBac.moyenneGenerale >= 10 ? 'niveau moyen' : 'niveau fragile'}`
         : 'Moyenne générale : non renseignée dans le dossier',
+      commentaireIA: (() => {
+        const moy = d.notesBac.moyenneGenerale;
+        if (moy === null) return 'Moyenne générale non renseignée dans le dossier. L\'IA adapte son évaluation aux notes individuelles et appréciations disponibles.';
+        const bacCtx = d.bac.serie ? ` — bac ${d.bac.serie}` : '';
+        if (moy >= 16) return `Moyenne générale excellente (${moy}/20${bacCtx}). Indicateur central très positif : solidité académique forte, capacité démontrée à réussir dans un cursus exigeant.`;
+        if (moy >= 14) return `Moyenne générale très solide (${moy}/20${bacCtx}). Niveau académique bien au-dessus des attentes, socle de compétences favorable pour la formation TS.`;
+        if (moy >= 12) return `Moyenne générale satisfaisante (${moy}/20${bacCtx}). Niveau compatible avec les exigences de la formation. L'IA pondère avec la progression et les appréciations.`;
+        const evo = candidat.evolutionNotes || 'stable';
+        if (moy >= 10) return `Moyenne juste (${moy}/20${bacCtx}). L'IA contextualise avec la dynamique de progression${evo === 'progression' ? ' (en amélioration)' : ''} et les appréciations pour affiner l'évaluation.`;
+        return `Moyenne fragile (${moy}/20${bacCtx}). Point de vigilance sur les capacités académiques. À contextualiser avec le parcours global, les appréciations et la motivation.`;
+      })(),
     });
 
     // 12. PROGRESSION
@@ -412,6 +463,11 @@ export class AnalyseurCandidatService {
       interpretation: evolution === 'progression' ? 'Dynamique en amélioration — prise en compte positive'
         : evolution === 'regression' ? 'Dynamique en baisse — point de vigilance'
         : 'Dynamique stable',
+      commentaireIA: evolution === 'progression'
+        ? `Trajectoire ascendante détectée${d.notesBac.moyenneGenerale ? ` (dernière moyenne connue : ${d.notesBac.moyenneGenerale}/20)` : ''}. L'IA valorise la capacité de progression — signe de potentiel, de maturité et de motivation croissante.`
+        : evolution === 'regression'
+        ? `Baisse de résultats observée${d.notesBac.moyenneGenerale ? ` (moyenne actuelle : ${d.notesBac.moyenneGenerale}/20)` : ''}. L'IA pondère ce signal avec les appréciations, le contexte personnel et les éventuelles contraintes extérieures.`
+        : `Résultats stables dans le temps${d.notesBac.moyenneGenerale ? ` (autour de ${d.notesBac.moyenneGenerale}/20)` : ''}. Régularité sans rupture notable — profil constant.`,
     });
 
     // 13. REGULARITE
@@ -425,6 +481,13 @@ export class AnalyseurCandidatService {
           : ecartType <= 4 ? 'Résultats contrastés selon les matières'
           : 'Résultats très irréguliers'
         : 'Régularité non évaluable (données insuffisantes)',
+      commentaireIA: (() => {
+        if (ecartType === null) return `Données insuffisantes pour évaluer la régularité (${d.notesBac.toutesNotes.length} note(s) disponible(s), minimum 3 requises).`;
+        const notesStr = d.notesBac.toutesNotes.length <= 6 ? ` Notes : ${d.notesBac.toutesNotes.map(n => `${n.matiere} ${n.note}`).join(', ')}.` : '';
+        if (ecartType <= 2) return `Profil homogène (écart-type ${ecartType.toFixed(1)}).${notesStr} Régularité des résultats — signe de rigueur et de méthode de travail constante.`;
+        if (ecartType <= 4) return `Profil contrasté (écart-type ${ecartType.toFixed(1)}).${notesStr} Forces et faiblesses marquées — l'IA identifie les points forts pertinents pour le TS.`;
+        return `Forte irrégularité (écart-type ${ecartType.toFixed(1)}).${notesStr} Écarts importants entre matières — peut signaler un manque de méthode ou des fragilités ciblées.`;
+      })(),
     });
 
     // 14. ECARTS_MATIERES
@@ -436,6 +499,15 @@ export class AnalyseurCandidatService {
       interpretation: pointsForts.length > 0
         ? `Points forts : ${pointsForts.join(', ')}${pointsFaibles.length > 0 ? `. Fragilités : ${pointsFaibles.join(', ')}` : ''}`
         : 'Pas d\'écart significatif identifié',
+      commentaireIA: (() => {
+        if (pointsForts.length > 0 && pointsFaibles.length > 0)
+          return `Profil contrasté. Points forts : ${pointsForts.join(', ')} — valorisés car pertinents pour le TS (${pointsForts.some(p => p.toLowerCase().includes('français') || p.toLowerCase().includes('philo') || p.toLowerCase().includes('histoire')) ? 'expression, analyse, culture générale' : 'compétences transférables'}). Fragilités : ${pointsFaibles.join(', ')} — contextualisées avec le reste du parcours.`;
+        if (pointsForts.length > 0)
+          return `Points forts identifiés : ${pointsForts.join(', ')}. L'IA valorise ces acquis dans l'évaluation globale du parcours scolaire.`;
+        if (pointsFaibles.length > 0)
+          return `Fragilités identifiées : ${pointsFaibles.join(', ')} sans point fort marqué. Contexte à approfondir — l'IA pondère avec les appréciations et la dynamique.`;
+        return 'Profil homogène — pas d\'écart significatif entre les matières. Régularité valorisée.';
+      })(),
     });
 
     // 15. REDOUBLEMENT
@@ -446,6 +518,9 @@ export class AnalyseurCandidatService {
       interpretation: d.scolarite.aRedouble
         ? 'Redoublement identifié — signalé factuellement, impact à évaluer (résilience/reprise) sans jugement'
         : 'Pas de redoublement identifié',
+      commentaireIA: d.scolarite.aRedouble
+        ? `Redoublement identifié dans le parcours${d.bac.serie ? ` (${d.bac.serie})` : ''}. L'IA ne pénalise pas automatiquement : un redoublement peut témoigner de résilience, de persévérance et d'une capacité à se remobiliser. À contextualiser avec la dynamique${evolution === 'progression' ? ' (en amélioration, signe positif)' : ''}.`
+        : 'Pas de redoublement identifié — parcours linéaire. Continuité scolaire sans rupture sur cet indicateur.',
     });
 
     // 16. RUPTURES
@@ -456,6 +531,9 @@ export class AnalyseurCandidatService {
       interpretation: d.scolarite.aRupture
         ? 'Rupture/interruption de parcours identifiée — signalée factuellement'
         : 'Pas de rupture de parcours identifiée (ou non renseigné)',
+      commentaireIA: d.scolarite.aRupture
+        ? `Rupture ou interruption de parcours détectée. L'IA signale factuellement sans pénaliser — une rupture peut être liée à des contraintes de vie ou à une réorientation.${d.scolarite.aEtudesSup ? ` Études supérieures identifiées par ailleurs (${d.scolarite.detailSup || 'post-bac'}).` : ''} Le contexte sera approfondi lors de l'oral.`
+        : 'Continuité du parcours scolaire — pas de rupture ni d\'interruption identifiée.',
     });
 
     // 17-22. Indicateurs minés depuis appréciations / lettre / activités
@@ -472,6 +550,11 @@ export class AnalyseurCandidatService {
       interpretation: assiduite.signal === 'positif' ? `Assiduité bonne (${assiduite.detail})`
         : assiduite.signal === 'negatif' ? `Assiduité à surveiller (${assiduite.detail})`
         : 'Assiduité : non renseignée dans le dossier',
+      commentaireIA: assiduite.signal === 'positif'
+        ? `Assiduité confirmée par les appréciations (${assiduite.detail}). Qualité essentielle pour la formation en alternance — présence régulière sur les terrains de stage et en cours.`
+        : assiduite.signal === 'negatif'
+        ? `Signalement d'assiduité fragile dans les appréciations (${assiduite.detail}). Point à approfondir lors de l'oral : contexte personnel, contraintes éventuelles, capacité à s'organiser pour une formation en alternance.`
+        : `Aucune mention d'assiduité dans le dossier${d.appreciations.disponible ? '' : ' (appréciations non disponibles)'}. L'IA ne pénalise pas l'absence d'information — l'assiduité sera évaluée lors de l'oral.`,
     });
 
     // 18. SERIEUX
@@ -485,6 +568,11 @@ export class AnalyseurCandidatService {
       interpretation: serieux.signal === 'positif' ? `Sérieux/implication : ${serieux.detail}`
         : serieux.signal === 'negatif' ? `Manque de sérieux signalé : ${serieux.detail}`
         : 'Sérieux/implication : non renseigné dans le dossier',
+      commentaireIA: serieux.signal === 'positif'
+        ? `Sérieux et implication confirmés par les appréciations (${serieux.detail}). Qualité importante pour les stages et la posture professionnelle attendue en travail social.`
+        : serieux.signal === 'negatif'
+        ? `Manque de sérieux signalé dans les appréciations (${serieux.detail}). Point à contextualiser lors de l'oral — maturité, évolution récente, contexte personnel.`
+        : `Information sur le sérieux/implication non disponible${d.appreciations.disponible ? '' : ' (appréciations non transmises)'}. Pas de pénalité — l'oral permettra d'évaluer la posture.`,
     });
 
     // 19. PARTICIPATION
@@ -498,6 +586,11 @@ export class AnalyseurCandidatService {
       interpretation: participation.signal === 'positif' ? `Participation positive (${participation.detail})`
         : participation.signal === 'negatif' ? `Participation à surveiller (${participation.detail})`
         : 'Participation/posture en classe : non renseigné dans le dossier',
+      commentaireIA: participation.signal === 'positif'
+        ? `Participation active et posture positive en classe confirmées (${participation.detail}). Compétence directement transférable pour le travail en équipe pluridisciplinaire et l'animation de groupe.`
+        : participation.signal === 'negatif'
+        ? `Difficultés de posture en classe signalées (${participation.detail}). À explorer en oral — maturité, contexte, capacité à évoluer en groupe professionnel.`
+        : `Participation/posture en classe non renseignée${d.appreciations.disponible ? '' : ' (appréciations non transmises)'}. L'IA ne pénalise pas — l'oral permettra d'évaluer les compétences relationnelles.`,
     });
 
     // 20. QUALITE_REDACTIONNELLE (évaluée sur la lettre de motivation)
@@ -511,6 +604,13 @@ export class AnalyseurCandidatService {
         : qualiteRedaction === 'correcte' ? 'Écriture correcte, structuration à renforcer'
         : qualiteRedaction === 'faible' ? 'Écriture peu structurée, difficultés rédactionnelles'
         : 'Qualité rédactionnelle non évaluable (lettre absente ou trop courte)',
+      commentaireIA: (() => {
+        const longueur = d.motivation.longueur;
+        if (qualiteRedaction === 'bonne') return `Bonne qualité rédactionnelle observée sur la lettre de motivation (${longueur} caractères). Écriture claire, structurée et argumentée — compétence clé pour les écrits professionnels du TS (rapports éducatifs, synthèses, notes d'observation).`;
+        if (qualiteRedaction === 'correcte') return `Qualité rédactionnelle correcte (lettre de ${longueur} caractères). Structuration à consolider. Critère de clarté uniquement — pas de discrimination sociale. Les écrits professionnels nécessitent une expression structurée.`;
+        if (qualiteRedaction === 'faible') return `Difficultés rédactionnelles observées (lettre de ${longueur} caractères). L'IA utilise ce critère pour évaluer la clarté d'expression uniquement, sans discrimination sociale. Point de vigilance pour les écrits professionnels.`;
+        return 'Non évaluable — lettre absente ou trop courte pour analyser la qualité rédactionnelle. Pas de pénalité.';
+      })(),
     });
 
     // 21. COMPETENCES_ORALES
@@ -523,6 +623,9 @@ export class AnalyseurCandidatService {
       valeur: oral.signal !== 'absent',
       interpretation: oral.signal === 'positif' ? `Compétences orales mentionnées (${oral.detail})`
         : 'Compétences orales : non renseigné dans le dossier',
+      commentaireIA: oral.signal === 'positif'
+        ? `Compétences orales mentionnées dans le dossier (${oral.detail}). Atout pour les entretiens professionnels, le travail en équipe et la relation d'accompagnement.`
+        : 'Compétences orales non mentionnées dans le dossier. L\'oral d\'admission permettra d\'évaluer cette compétence essentielle pour le travail social (relation, médiation, animation).',
     });
 
     // 22. TRAVAIL_GROUPE
@@ -535,6 +638,9 @@ export class AnalyseurCandidatService {
       valeur: groupe.signal !== 'absent',
       interpretation: groupe.signal === 'positif' ? `Travail en groupe mentionné (${groupe.detail})`
         : 'Travail en groupe/coopération : non renseigné dans le dossier',
+      commentaireIA: groupe.signal === 'positif'
+        ? `Capacité de coopération et travail en groupe identifiés (${groupe.detail}). Compétence essentielle pour le travail social pluridisciplinaire — réunions d'équipe, projets collectifs, coordination avec les partenaires.`
+        : 'Travail en groupe/coopération non mentionné dans le dossier. L\'oral d\'admission permettra d\'évaluer cette compétence relationnelle essentielle.',
     });
 
     // 23. ETUDES_SUP
@@ -545,6 +651,9 @@ export class AnalyseurCandidatService {
       interpretation: d.scolarite.aEtudesSup
         ? `Études supérieures : ${d.scolarite.detailSup}${d.scolarite.niveauSup ? ` (${d.scolarite.niveauSup})` : ''}`
         : 'Pas d\'études supérieures identifiées',
+      commentaireIA: d.scolarite.aEtudesSup
+        ? `Parcours post-bac identifié : ${d.scolarite.detailSup || 'formation supérieure'}${d.scolarite.niveauSup ? ` (${d.scolarite.niveauSup})` : ''}. L'IA évalue la cohérence avec le projet TS et la capacité démontrée à s'engager dans des études longues.${d.scolarite.validationSup ? ` Validation : ${d.scolarite.validationSup}.` : ''}`
+        : `Pas d'études supérieures identifiées${d.bac.enCours ? ' — candidat en terminale, parcours classique' : ''}. Pas de pénalité.`,
     });
 
     // 24. VALIDATION_SUP
@@ -555,6 +664,10 @@ export class AnalyseurCandidatService {
       interpretation: d.scolarite.validationSup
         ? `Validation dans le supérieur : ${d.scolarite.validationSup}`
         : d.scolarite.aEtudesSup ? 'Validation dans le supérieur : non renseigné dans le dossier' : 'Non applicable',
+      commentaireIA: d.scolarite.validationSup
+        ? `Résultats post-bac disponibles (${d.scolarite.validationSup}${d.scolarite.detailSup ? ` en ${d.scolarite.detailSup}` : ''}). Intégrés dans l'évaluation du potentiel académique et de la persévérance.`
+        : d.scolarite.aEtudesSup ? `Résultat de validation en ${d.scolarite.detailSup || 'post-bac'} non renseigné dans le dossier. L'IA ne peut pas évaluer la réussite dans le supérieur — point à clarifier.`
+        : 'Non applicable — candidat sans parcours post-bac identifié.',
     });
 
     // 25. APPRECIATIONS_SUP
@@ -565,6 +678,9 @@ export class AnalyseurCandidatService {
       interpretation: d.scolarite.aEtudesSup
         ? 'Appréciations du supérieur : non renseigné dans le dossier'
         : 'Non applicable',
+      commentaireIA: d.scolarite.aEtudesSup
+        ? 'Appréciations du supérieur rarement disponibles dans les exports Parcoursup. Pas de pénalité.'
+        : 'Non applicable — pas de parcours post-bac identifié.',
     });
 
     // 26. CONTRAINTES_DECLAREES
@@ -576,6 +692,9 @@ export class AnalyseurCandidatService {
       interpretation: contraintes
         ? `Contraintes déclarées par le candidat : ${contraintes}`
         : 'Aucune contrainte déclarée par le candidat',
+      commentaireIA: contraintes
+        ? `Contraintes déclarées par le candidat : ${contraintes}. L'IA contextualise les résultats scolaires en fonction de ces éléments — des résultats moyens sous contrainte peuvent témoigner de résilience et de persévérance.`
+        : 'Aucune contrainte déclarée par le candidat. L\'absence de déclaration est neutre — ni positive ni négative.',
     });
 
     // 27. DONNEES_MANQUANTES
@@ -587,6 +706,13 @@ export class AnalyseurCandidatService {
       interpretation: manquantes.length > 0
         ? `Données manquantes : ${manquantes.length} indicateur(s) — ${manquantes.slice(0, 5).join(', ')}${manquantes.length > 5 ? '...' : ''}`
         : 'Toutes les données sont disponibles',
+      commentaireIA: manquantes.length > 10
+        ? `${manquantes.length} indicateurs manquants — dossier très incomplet. Score potentiellement sous-évalué.`
+        : manquantes.length > 5
+        ? `${manquantes.length} indicateurs manquants. L'IA adapte son évaluation aux données disponibles.`
+        : manquantes.length > 0
+        ? `${manquantes.length} indicateur(s) manquant(s). Impact limité sur l'évaluation globale.`
+        : 'Dossier complet — tous les indicateurs sont disponibles pour l\'évaluation.',
     });
 
     return indicateurs;
@@ -740,6 +866,13 @@ export class AnalyseurCandidatService {
       interpretation: engFound
         ? `Engagement citoyen/associatif ${engRegulier ? 'régulier' : 'ponctuel'}${engResponsabilite ? ', avec prise de responsabilités' : ''}`
         : 'Pas d\'engagement citoyen/associatif identifié',
+      commentaireIA: (() => {
+        if (!engFound) return 'Pas d\'engagement citoyen/associatif identifié dans le dossier. Ne pénalise pas automatiquement — d\'autres formes d\'expériences (emploi, bénévolat, BAFA) sont évaluées.';
+        const ctx = d.activites.engagementsCitoyen ? ` (${d.activites.engagementsCitoyen.substring(0, 80).trim()}${d.activites.engagementsCitoyen.length > 80 ? '...' : ''})` : '';
+        if (engRegulier && engResponsabilite) return `Engagement citoyen régulier avec prise de responsabilités${ctx}. Très valorisé — témoigne d'une implication durable, d'une posture active et d'une capacité à assumer un rôle.`;
+        if (engRegulier) return `Engagement citoyen régulier identifié${ctx}. Valorisé — la constance démontre une réelle implication citoyenne et une fiabilité.`;
+        return `Engagement citoyen ponctuel identifié${ctx}. Valorisable, surtout si en lien avec le champ social ou le contact avec un public vulnérable.`;
+      })(),
     });
 
     // 2. BENEVOLAT
@@ -753,6 +886,11 @@ export class AnalyseurCandidatService {
       interpretation: benevFound
         ? `Bénévolat ${benevRegulier ? 'régulier (preuve de constance)' : 'ponctuel'}`
         : 'Pas de bénévolat identifié',
+      commentaireIA: (() => {
+        if (!benevFound) return 'Pas de bénévolat mentionné dans le dossier. D\'autres formes d\'engagement (associatif, emploi, animation) sont considérées pour évaluer l\'implication.';
+        if (benevRegulier) return `Bénévolat régulier identifié — preuve de constance et d'engagement durable. Très valorisé pour le TS : capacité à s'inscrire dans la durée, fiabilité, sens du service.`;
+        return `Bénévolat ponctuel identifié. Valorisable, surtout si les missions impliquent un contact avec un public vulnérable ou une posture d'accompagnement.`;
+      })(),
     });
 
     // 3. SERVICE_CIVIQUE
@@ -765,6 +903,9 @@ export class AnalyseurCandidatService {
       interpretation: scFound
         ? `Service civique identifié : ${scDetail || 'détails non précisés'}`
         : 'Pas de service civique identifié',
+      commentaireIA: scFound
+        ? `Service civique identifié${scDetail ? ` : ${scDetail}` : ''}. Expérience structurante très valorisée — contact terrain, missions longues (6-12 mois), immersion dans un environnement professionnel. Preuve d'engagement et de maturité.`
+        : 'Pas de service civique identifié. Pas de pénalité — d\'autres expériences (emploi, bénévolat, associatif) sont considérées.',
     });
 
     // 4. BAFA
@@ -779,6 +920,11 @@ export class AnalyseurCandidatService {
         ? `BAFA identifié${bafaExperience ? ' + expérience réelle d\'animation' : ''}`
         : animationFound ? 'Expérience d\'animation (BAFA non mentionné)'
         : 'BAFA/animation : non mentionné',
+      commentaireIA: bafaFound && bafaExperience
+        ? 'BAFA obtenu avec expérience terrain d\'animation — très pertinent pour le TS. Compétences démontrées en animation de groupe, gestion des conflits, responsabilité éducative et adaptation aux publics.'
+        : bafaFound ? 'BAFA identifié — compétence d\'encadrement formalisée par un diplôme. Valorisé pour la posture éducative et la capacité à animer un groupe.'
+        : animationFound ? 'Expérience d\'animation identifiée sans BAFA formalisé. Compétences pratiques en gestion de groupe valorisées.'
+        : 'BAFA/animation non mentionné dans le dossier. Pas de pénalité — d\'autres formes d\'encadrement sont considérées.',
     });
 
     // 5. EMPLOIS
@@ -793,6 +939,12 @@ export class AnalyseurCandidatService {
       interpretation: emploiFound
         ? `Expériences professionnelles identifiées${contactPublic ? ' au contact du public' : ''}`
         : 'Pas d\'emploi/stage identifié',
+      commentaireIA: (() => {
+        if (!emploiFound) return `Pas d'emploi/stage identifié.${d.bac.enCours ? ' Normal pour un candidat en terminale — pas de pénalité.' : ' Pas de pénalité automatique.'}`;
+        const proCtx = d.activites.experiencesPro ? ` (${d.activites.experiencesPro.substring(0, 80).trim()}${d.activites.experiencesPro.length > 80 ? '...' : ''})` : '';
+        if (contactPublic) return `Emploi/stage au contact du public identifié${proCtx}. Compétences relationnelles acquises en situation réelle — écoute, gestion du stress, adaptation aux différents interlocuteurs.`;
+        return `Expérience professionnelle identifiée${proCtx}. Valorisée pour la maturité, l'autonomie et la capacité à s'inscrire dans un cadre professionnel.`;
+      })(),
     });
 
     // 6. LIEN_DIRECT_TS
@@ -809,6 +961,9 @@ export class AnalyseurCandidatService {
       interpretation: tsFound
         ? `Lien direct avec le travail social : ${tsDetail || 'exposition public vulnérable/accompagnement'}`
         : 'Pas de lien direct avec le travail social identifié',
+      commentaireIA: tsFound
+        ? `Expérience en lien direct avec le travail social${tsDetail ? ` — public/secteur identifié : ${tsDetail}` : ''}. Indicateur fortement valorisé : connaissance du terrain, exposition aux réalités du métier, compréhension des enjeux d'accompagnement.`
+        : 'Pas de lien direct avec le travail social identifié dans le dossier. L\'IA évalue les compétences transférables via d\'autres indicateurs (emploi, animation, engagement).',
     });
 
     // 7. COMPETENCES_TRANSFERABLES
@@ -831,6 +986,13 @@ export class AnalyseurCandidatService {
       interpretation: competences.length > 0
         ? `Compétences transférables identifiées : ${competences.slice(0, 5).join(', ')}`
         : 'Compétences transférables : non identifiées explicitement',
+      commentaireIA: competences.length >= 4
+        ? `${competences.length} compétences transférables identifiées : ${competences.slice(0, 5).join(', ')}. Profil riche et diversifié — socle de compétences directement mobilisables pour le travail social.`
+        : competences.length >= 2
+        ? `Compétences transférables identifiées : ${competences.join(', ')}. Socle exploitable pour la formation TS, à approfondir en situation professionnelle.`
+        : competences.length === 1
+        ? `Une compétence transférable identifiée (${competences[0]}). Profil à étoffer — l'oral permettra d'identifier d'autres ressources.`
+        : 'Aucune compétence transférable explicitement identifiée dans le dossier. L\'oral permettra de mieux cerner le profil du candidat.',
     });
 
     // 8. PRISE_RESPONSABILITE
@@ -845,6 +1007,9 @@ export class AnalyseurCandidatService {
       interpretation: respoFound
         ? 'Prise de responsabilités identifiée (encadrement/coordination/gestion)'
         : 'Prise de responsabilités : non identifiée',
+      commentaireIA: respoFound
+        ? 'Prise de responsabilités identifiée (encadrement, coordination ou gestion). Signe de maturité, de capacité d\'initiative et de leadership — compétences très valorisées pour le travail social (coordination de projets, encadrement d\'équipe).'
+        : 'Pas de prise de responsabilité formelle identifiée dans le dossier. D\'autres formes d\'engagement et de posture active sont considérées dans l\'évaluation.',
     });
 
     // 9. STABILITE_CONTINUITE
@@ -859,6 +1024,10 @@ export class AnalyseurCandidatService {
         ? 'Engagements longs/répétés — parcours construit'
         : mentionsDuree > 0 ? 'Engagements identifiés mais durée limitée'
         : 'Stabilité/continuité : non évaluable',
+      commentaireIA: engagementsLongs
+        ? 'Parcours construit avec engagements durables. Témoigne de persévérance et de constance.'
+        : mentionsDuree > 0 ? 'Engagements ponctuels. La constance pourra être évaluée lors de l\'oral.'
+        : 'Stabilité non évaluable — informations insuffisantes sur la durée des engagements.',
     });
 
     // 10. CAPACITE_ENSEIGNEMENTS
@@ -873,6 +1042,9 @@ export class AnalyseurCandidatService {
       interpretation: capaciteRecul
         ? 'Mise en mots des apprentissages identifiée — capacité de recul'
         : 'Capacité à tirer des enseignements : non identifiée explicitement',
+      commentaireIA: capaciteRecul
+        ? 'Réflexivité identifiée — le candidat verbalise ses apprentissages. Compétence clé pour la pratique réflexive en TS.'
+        : 'Pas de mise en mots des apprentissages détectée. Point à explorer en oral.',
     });
 
     // 11. DIVERSITE_CONTEXTES
@@ -890,6 +1062,11 @@ export class AnalyseurCandidatService {
       interpretation: contextes.length >= 3 ? `Grande diversité de contextes : ${contextes.join(', ')}`
         : contextes.length >= 1 ? `Contexte(s) : ${contextes.join(', ')}`
         : 'Diversité des contextes : non évaluable',
+      commentaireIA: contextes.length >= 3
+        ? `Grande diversité (${contextes.length} contextes) — ouverture d'esprit et adaptabilité démontrées.`
+        : contextes.length >= 1
+        ? `Contexte(s) identifié(s) : ${contextes.join(', ')}. Adaptabilité à évaluer en oral.`
+        : 'Diversité des contextes non évaluable — informations insuffisantes.',
     });
 
     // 12. CONTRAINTES_VIE
@@ -903,6 +1080,9 @@ export class AnalyseurCandidatService {
       interpretation: contraintesVie
         ? 'Contraintes de vie déclarées — ne pas pénaliser automatiquement'
         : 'Pas de contraintes de vie déclarées',
+      commentaireIA: contraintesVie
+        ? 'Contraintes de vie identifiées. L\'IA contextualise les résultats sans pénaliser — la résilience est valorisée.'
+        : 'Aucune contrainte de vie déclarée. L\'absence de déclaration est neutre.',
     });
 
     // 13. PRECISION_INFORMATIONS
@@ -918,6 +1098,13 @@ export class AnalyseurCandidatService {
         : precisionScore >= 2 ? 'Informations partiellement précisées'
         : precisionScore >= 1 ? 'Informations peu précisées (missions/durée/public manquants)'
         : 'Informations trop vagues pour être pleinement valorisées',
+      commentaireIA: precisionScore >= 3
+        ? 'Informations très précises (missions, dates, public). Plus c\'est précis, plus c\'est valorisable.'
+        : precisionScore >= 2
+        ? 'Précision partielle. Des détails supplémentaires renforceraient la valorisation.'
+        : precisionScore >= 1
+        ? 'Informations peu précisées. L\'IA ne peut pas pleinement valoriser ces expériences.'
+        : 'Informations trop vagues pour être exploitées. L\'oral permettra de préciser.',
     });
 
     return indicateurs;
@@ -937,13 +1124,13 @@ export class AnalyseurCandidatService {
     const recul = get('CAPACITE_ENSEIGNEMENTS');
     const precision = get('PRECISION_INFORMATIONS');
 
-    const nbCompetences = competences?.disponible ? (competences.valeur as string).split(', ').length : 0;
-    const engDurable = engagement?.disponible && (engagement.valeur as string).includes('régulier');
+    const nbCompetences = competences?.disponible && typeof competences.valeur === 'string' ? competences.valeur.split(', ').length : 0;
+    const engDurable = engagement?.disponible && typeof engagement.valeur === 'string' && engagement.valeur.includes('régulier');
     const scDispo = serviceCivique?.disponible;
     const tsContact = lienTS?.disponible;
     const hasRecul = recul?.disponible;
-    const engagementsLongs = stabilite?.disponible && (stabilite.valeur as string).includes('construit');
-    const precisionVal = (precision?.valeur as number) || 0;
+    const engagementsLongs = stabilite?.disponible && typeof stabilite.valeur === 'string' && stabilite.valeur.includes('construit');
+    const precisionVal = typeof precision?.valeur === 'number' ? precision.valeur : 0;
 
     // Compter les types d'engagement
     const nbTypesEngagement = [engagement?.disponible, benevolat?.disponible, serviceCivique?.disponible,
@@ -1085,6 +1272,11 @@ export class AnalyseurCandidatService {
         ? `Projet clair : métier ${metierMentioned}, secteur ${secteurMentioned}`
         : projetPartiel ? `Projet partiellement défini${metierMentioned ? ` (métier: ${metierMentioned})` : ''}${secteurMentioned ? ` (secteur: ${secteurMentioned})` : ''}`
         : 'Projet peu précisé (métier/secteur/public non identifiés)',
+      commentaireIA: projetClair
+        ? `Projet professionnel clair et ciblé : le candidat identifie le métier (${metierMentioned}) et le secteur (${secteurMentioned}). Signe de maturité et de réflexion aboutie sur son orientation.`
+        : projetPartiel
+        ? `Projet partiellement défini${metierMentioned ? ` — métier identifié : ${metierMentioned}` : ''}${secteurMentioned ? ` — secteur identifié : ${secteurMentioned}` : ''}. Des éléments sont présents mais ${!metierMentioned ? 'le métier' : 'le secteur d\'intervention'} reste à préciser.`
+        : `Projet professionnel flou : ni métier ni secteur clairement identifié dans la lettre (${d.motivation.longueur} caractères). Point à approfondir en oral — le candidat doit préciser son orientation.`,
     });
 
     // 2. COHERENCE_FILIERE
@@ -1109,6 +1301,11 @@ export class AnalyseurCandidatService {
       interpretation: coherenceFiliere ? `Cohérence avec ${filiere}`
         : confusions ? confusions
         : 'Cohérence filière non vérifiable',
+      commentaireIA: coherenceFiliere
+        ? `Le projet est cohérent avec la filière ${filiere}${metierMentioned ? ` — le candidat mentionne correctement le métier (${metierMentioned})` : ''}. Adéquation entre le discours et la formation visée.`
+        : confusions
+        ? `${confusions} — le candidat semble confondre les métiers du travail social. Point important à clarifier en oral pour vérifier la compréhension des spécificités de la filière ${filiere}.`
+        : `Cohérence avec la filière ${filiere || '(non précisée)'} non vérifiable en l'état. La lettre ne mentionne pas explicitement le métier visé.`,
     });
 
     // 3. RAISONS_CHOIX
@@ -1122,6 +1319,11 @@ export class AnalyseurCandidatService {
       interpretation: raisonsCount >= 3 ? 'Raisons du choix clairement exprimées (déclencheurs, valeurs, expériences)'
         : raisonsCount >= 1 ? 'Quelques raisons évoquées'
         : 'Raisons du choix : non explicitées',
+      commentaireIA: raisonsCount >= 3
+        ? 'Raisons du choix clairement explicitées avec déclencheurs identifiables. Motivation argumentée.'
+        : raisonsCount >= 1
+        ? 'Quelques raisons évoquées. La motivation est présente mais gagnerait en profondeur.'
+        : 'Aucune raison du choix explicitée. "Beau discours" ≠ motivation réelle — preuves requises.',
     });
 
     // 4. APPUIS_EXPERIENCES
@@ -1136,6 +1338,9 @@ export class AnalyseurCandidatService {
       interpretation: appuisExperiences
         ? 'Motivation étayée par des expériences concrètes'
         : 'Argumentation principalement déclarative, peu d\'appuis concrets',
+      commentaireIA: appuisExperiences
+        ? `Motivation étayée par des expériences concrètes (${appuisCount} références identifiées). L'argumentation s'appuie sur du vécu — très valorisé car "beau discours" ≠ motivation réelle. Les preuves terrain renforcent la crédibilité.`
+        : 'Argumentation principalement déclarative. Le candidat affirme sa motivation sans l\'ancrer dans des expériences précises. "Beau discours" ≠ motivation réelle — l\'oral devra vérifier la profondeur.',
     });
 
     // 5. FAISABILITE
@@ -1147,6 +1352,9 @@ export class AnalyseurCandidatService {
       valeur: faisabiliteCount >= 2,
       interpretation: faisabiliteCount >= 2 ? 'Projet paraît réaliste au regard du parcours'
         : 'Faisabilité du projet : peu d\'éléments pour évaluer',
+      commentaireIA: faisabiliteCount >= 2
+        ? 'Le projet semble réaliste et réfléchi. Le candidat mentionne des étapes concrètes.'
+        : 'Faisabilité difficile à évaluer. Peu d\'éléments concrets sur la projection dans le parcours.',
     });
 
     // 6. REPRESENTATION_METIER
@@ -1161,6 +1369,12 @@ export class AnalyseurCandidatService {
       interpretation: exigencesCount >= 3 ? 'Bonne compréhension des exigences du métier (posture, travail d\'équipe, écrits, éthique)'
         : exigencesCount >= 1 ? 'Compréhension partielle des exigences du métier'
         : 'Représentation du métier : peu d\'éléments sur les exigences',
+      commentaireIA: (() => {
+        const exigencesIdentifiees = exigencesKeywords.filter(k => lettreLC.includes(k)).slice(0, 4);
+        if (exigencesCount >= 3) return `Bonne représentation du métier — le candidat mentionne : ${exigencesIdentifiees.join(', ')}. Compréhension des exigences professionnelles (posture, éthique, cadre, travail d'équipe).`;
+        if (exigencesCount >= 1) return `Compréhension partielle du métier (${exigencesIdentifiees.join(', ')}). Certaines exigences sont identifiées mais la vision reste incomplète — risque de sous-estimer les contraintes.`;
+        return `Peu d'éléments sur la représentation du métier dans la lettre. Risque de vision idéalisée — les exigences concrètes (écrits, posture professionnelle, cadre institutionnel) ne sont pas abordées.`;
+      })(),
     });
 
     // 7. MOTIVATION_INTRINSEQUE (avec détection du "sauveur")
@@ -1182,6 +1396,14 @@ export class AnalyseurCandidatService {
         : valeursCount >= 2 ? `Motivation intrinsèque solide (valeurs : ${valeurKeywords.filter(k => lettreLC.includes(k)).slice(0, 3).join(', ')})`
         : valeursCount >= 1 ? 'Motivation intrinsèque présente mais peu développée'
         : 'Motivation intrinsèque : peu d\'éléments',
+      commentaireIA: (() => {
+        const valeursIdentifiees = valeurKeywords.filter(k => lettreLC.includes(k)).slice(0, 4);
+        if (sauveurDetecte && !postureRealiste) return 'Posture "sauveur" détectée dans la lettre — le candidat exprime un désir de "sauver" sans mention de cadre, limites ou distance professionnelle. Risque d\'idéalisation du métier et d\'épuisement. Point à approfondir en oral.';
+        if (sauveurDetecte && postureRealiste) return 'Élan fort de motivation tempéré par une conscience des limites et du cadre professionnel. Posture équilibrée entre engagement et distance — maturité appréciable.';
+        if (valeursCount >= 3) return `Motivation intrinsèque solide, ancrée dans des valeurs clairement exprimées : ${valeursIdentifiees.join(', ')}. Posture compatible avec les exigences du travail social.`;
+        if (valeursCount >= 1) return `Motivation présente mais peu développée (valeurs évoquées : ${valeursIdentifiees.join(', ')}). L'ancrage dans des valeurs professionnelles reste à approfondir.`;
+        return 'Peu d\'éléments sur la motivation intrinsèque. Les valeurs professionnelles du travail social ne sont pas explicitement évoquées — risque de motivation superficielle.';
+      })(),
     });
 
     // 8. ANALYSE_PARCOURS
@@ -1195,6 +1417,11 @@ export class AnalyseurCandidatService {
       interpretation: analyseCount >= 2 ? 'Capacité à analyser son parcours et ses choix — réflexivité visible'
         : analyseCount >= 1 ? 'Quelques éléments d\'analyse du parcours'
         : 'Analyse du parcours : peu de recul apparent',
+      commentaireIA: analyseCount >= 2
+        ? 'Réflexivité visible — le candidat analyse son parcours avec recul. Compétence essentielle pour le TS.'
+        : analyseCount >= 1
+        ? 'Quelques éléments de réflexion identifiés. La capacité d\'analyse reste à approfondir.'
+        : 'Peu de recul sur le parcours. La réflexivité pourra être évaluée en oral.',
     });
 
     // 9. PROJECTION_FORMATION
@@ -1208,6 +1435,12 @@ export class AnalyseurCandidatService {
       interpretation: projectionCount >= 2 ? 'Projection dans la formation visible (alternance, stages, organisation)'
         : projectionCount >= 1 ? 'Quelques éléments de projection dans la formation'
         : 'Projection dans la formation : non évoquée',
+      commentaireIA: (() => {
+        const projIdentifiees = projectionKeywords.filter(k => lettreLC.includes(k)).slice(0, 4);
+        if (projectionCount >= 3) return `Le candidat se projette concrètement dans la formation : ${projIdentifiees.join(', ')}. Signe de préparation solide et de compréhension du cursus (alternance, stages terrain, exigences théoriques).`;
+        if (projectionCount >= 1) return `Quelques éléments de projection dans la formation (${projIdentifiees.join(', ')}). Le candidat a réfléchi à certains aspects du cursus mais la vision reste partielle.`;
+        return `Aucune projection dans la formation évoquée dans la lettre. Le candidat n'a pas anticipé les exigences du cursus (alternance, stages, écrits). Point à clarifier en oral.`;
+      })(),
     });
 
     // 10. PERSONNALISATION
@@ -1221,6 +1454,11 @@ export class AnalyseurCandidatService {
       interpretation: estGenerique ? 'Texte générique, peu personnalisé'
         : hasExemples ? 'Argumentation personnalisée avec exemples concrets'
         : 'Texte standard sans élément distinctif marquant',
+      commentaireIA: estGenerique
+        ? `Texte générique détecté (lettre de ${d.motivation.longueur} caractères) — pourrait être un copier-coller ou un discours type. L'IA distingue discours générique et motivation réelle. "Beau discours" ≠ motivation réelle.`
+        : hasExemples
+        ? `Texte personnalisé avec exemples concrets et références datées. Authenticité et implication dans la rédaction — le candidat ancre son discours dans du vécu personnel.`
+        : `Texte standard sans élément distinctif marquant (${d.motivation.longueur} caractères). Ni générique ni vraiment personnalisé — le candidat n'a pas su se démarquer par des exemples concrets.`,
     });
 
     // 11. QUALITE_EXPRESSION
@@ -1233,6 +1471,13 @@ export class AnalyseurCandidatService {
         : qualite === 'correcte' ? 'Expression correcte — structuration à renforcer'
         : qualite === 'faible' ? 'Expression peu structurée — observation pour la clarté, sans en faire un critère discriminant'
         : 'Qualité d\'expression non évaluable',
+      commentaireIA: qualite === 'bonne'
+        ? `Expression claire et structurée dans la lettre (${d.motivation.longueur} caractères). Critère de clarté uniquement — pas de discrimination sociale. Capacité à organiser ses idées et à argumenter.`
+        : qualite === 'correcte'
+        ? `Expression correcte (${d.motivation.longueur} caractères). La structuration peut être renforcée. Critère de clarté uniquement — la qualité de langue n'est pas un critère de discrimination sociale.`
+        : qualite === 'faible'
+        ? `Expression peu structurée (${d.motivation.longueur} caractères). Observation pour la clarté d'expression uniquement, sans en faire un critère discriminant. Les écrits professionnels du TS nécessitent toutefois une expression claire.`
+        : 'Non évaluable — lettre trop courte pour analyser la qualité d\'expression. Pas de pénalité.',
     });
 
     // 12. RECONVERSION
@@ -1246,6 +1491,9 @@ export class AnalyseurCandidatService {
       interpretation: reconversion
         ? 'Parcours atypique/reconversion — valoriser cohérence et maturité si argumenté'
         : 'Pas de reconversion/parcours atypique identifié',
+      commentaireIA: reconversion
+        ? `Reconversion ou parcours atypique identifié dans la lettre. L'IA valorise la cohérence et la maturité du cheminement — un parcours de reconversion témoigne souvent d'une motivation réfléchie et d'une expérience de vie enrichissante pour le TS.`
+        : `Parcours classique — pas de reconversion identifiée.${d.bac.enCours ? ' Candidat en terminale, parcours linéaire attendu.' : ''}`,
     });
 
     // 13. INFORMATIONS_MANQUANTES
@@ -1257,6 +1505,11 @@ export class AnalyseurCandidatService {
       interpretation: d.motivation.longueur < 50 ? 'Lettre très courte ou absente — informations très insuffisantes'
         : nbManquants > 5 ? `Plusieurs indicateurs non évaluables (${nbManquants})`
         : 'Informations suffisantes pour évaluation',
+      commentaireIA: d.motivation.longueur < 50
+        ? 'Lettre très courte ou absente — évaluation très limitée sur ce critère.'
+        : nbManquants > 5
+        ? `${nbManquants} indicateurs manquants. L'IA adapte son évaluation aux données disponibles.`
+        : 'Informations suffisantes pour une évaluation complète de la motivation.',
     });
 
     return indicateurs;

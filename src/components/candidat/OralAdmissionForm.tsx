@@ -27,7 +27,7 @@ function NoteInput({
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-sm text-shine-text-secondary flex-1">{label}</span>
+      <span className="text-sm text-flat-text-secondary flex-1">{label}</span>
       <div className="flex items-center gap-1">
         {steps.map((step) => (
           <button
@@ -36,15 +36,15 @@ function NoteInput({
             onClick={() => onChange(step)}
             className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all ${
               value === step
-                ? 'bg-primary-500 text-white shadow-sm scale-105'
-                : 'bg-slate-100 text-shine-text-secondary hover:bg-slate-200'
+                ? 'bg-primary-500 text-white scale-105'
+                : 'bg-slate-100 text-flat-text-secondary hover:bg-slate-200'
             }`}
           >
             {step}
           </button>
         ))}
       </div>
-      <span className="text-sm font-bold text-shine-text-primary w-12 text-right">{value}/{max}</span>
+      <span className="text-sm font-bold text-flat-fg w-12 text-right">{value}/{max}</span>
     </div>
   );
 }
@@ -85,20 +85,20 @@ export function OralAdmissionForm({ candidatId, existingOral, onSaved }: OralAdm
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-indigo-500" />
-          <h3 className="text-base font-semibold text-shine-text-primary">Oral d'admission</h3>
+          <h3 className="text-base font-semibold text-flat-fg">Oral d'admission</h3>
         </div>
         <div className="text-center">
           <span className={`text-2xl font-bold ${
             total >= 9 ? 'text-emerald-600' : total >= 6 ? 'text-amber-600' : 'text-red-500'
           }`}>{total}</span>
-          <span className="text-sm text-shine-text-tertiary">/12</span>
+          <span className="text-sm text-flat-text-tertiary">/12</span>
         </div>
       </div>
 
       {/* Jury */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-medium text-shine-text-secondary mb-1 block">Jury 1</label>
+          <label className="text-xs font-medium text-flat-text-secondary mb-1 block">Jury 1</label>
           <input
             type="text"
             value={form.jury1Nom}
@@ -108,7 +108,7 @@ export function OralAdmissionForm({ candidatId, existingOral, onSaved }: OralAdm
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-shine-text-secondary mb-1 block">Jury 2</label>
+          <label className="text-xs font-medium text-flat-text-secondary mb-1 block">Jury 2</label>
           <input
             type="text"
             value={form.jury2Nom}
@@ -120,7 +120,7 @@ export function OralAdmissionForm({ candidatId, existingOral, onSaved }: OralAdm
       </div>
 
       {/* Notes */}
-      <div className="space-y-3 border border-shine-border rounded-xl p-4">
+      <div className="space-y-3 border border-gray-200 rounded-lg p-4">
         <NoteInput
           label="Participation dans le collectif"
           value={form.noteParticipationCollectif}
@@ -145,7 +145,7 @@ export function OralAdmissionForm({ candidatId, existingOral, onSaved }: OralAdm
 
       {/* Commentaires */}
       <div>
-        <label className="text-xs font-medium text-shine-text-secondary mb-1 block">Commentaires</label>
+        <label className="text-xs font-medium text-flat-text-secondary mb-1 block">Commentaires</label>
         <textarea
           value={form.commentaires}
           onChange={(e) => setForm({ ...form, commentaires: e.target.value })}
@@ -155,7 +155,7 @@ export function OralAdmissionForm({ candidatId, existingOral, onSaved }: OralAdm
       </div>
 
       <div>
-        <label className="text-xs font-medium text-shine-text-secondary mb-1 block">Points de vigilance</label>
+        <label className="text-xs font-medium text-flat-text-secondary mb-1 block">Points de vigilance</label>
         <textarea
           value={form.pointsVigilance}
           onChange={(e) => setForm({ ...form, pointsVigilance: e.target.value })}

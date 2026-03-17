@@ -17,9 +17,11 @@ export const CandidatCard: React.FC<CandidatCardProps> = ({ candidat, onClick })
       analyse: 'border-l-status-analyzed',
       en_relecture: 'border-l-status-reviewing',
       valide: 'border-l-status-validated',
+      rejete: 'border-l-red-500',
+      liste_attente: 'border-l-orange-500',
       erreur: 'border-l-status-error',
     };
-    return colors[candidat.statut];
+    return colors[candidat.statut] || colors.importe;
   };
 
   const getEvolutionIcon = () => {

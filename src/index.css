@@ -3,74 +3,152 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --sidebar-width: 240px;
+  }
+
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
-    @apply bg-shine-bg text-shine-text-primary font-sans antialiased;
+    @apply bg-white text-flat-fg font-sans;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-sans tracking-tight text-shine-text-primary;
+    @apply font-sans font-bold tracking-tight text-flat-fg;
+    letter-spacing: -0.02em;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-200 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-300;
+  }
+
+  /* Selection */
+  ::selection {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: inherit;
+  }
+
+  /* Checkbox */
+  input[type="checkbox"] {
+    @apply accent-primary-500;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    @apply accent-primary-500;
   }
 }
 
 @layer components {
-  /* Shine Card - flat white surface */
-  .shine-card {
-    @apply bg-white border border-shine-border rounded-xl;
+  /* ══════════════════════════════════════
+     CARDS — Flat color blocks, no shadows
+  ══════════════════════════════════════ */
+  .card {
+    @apply bg-white rounded-lg p-6;
   }
 
-  /* Backward compat: glass-card now maps to shine-card */
+  .card-elevated {
+    @apply bg-white rounded-lg p-6;
+  }
+
+  .card-muted {
+    @apply bg-gray-100 rounded-lg p-6;
+  }
+
+  .card-interactive {
+    @apply bg-white rounded-lg p-6 cursor-pointer
+           transition-all duration-200 hover:scale-[1.02] hover:bg-gray-50;
+  }
+
+  /* Backward compat */
+  .shine-card,
   .glass-card {
-    @apply bg-white border border-shine-border rounded-xl;
+    @apply card;
   }
 
-  /* Buttons */
+  /* ══════════════════════════════════════
+     BUTTONS — Flat, bold, scale on hover
+  ══════════════════════════════════════ */
   .btn {
     @apply inline-flex items-center justify-center gap-2
-           rounded-lg font-medium text-sm
-           transition-colors duration-150
+           rounded-md font-semibold text-sm leading-none
+           transition-all duration-200 select-none
            disabled:opacity-50 disabled:cursor-not-allowed
-           focus-ring;
+           outline-none
+           focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
   }
 
   .btn-primary {
     @apply bg-primary-500 text-white
-           hover:bg-primary-600
-           px-4 py-2.5;
+           hover:bg-primary-600 hover:scale-105
+           active:bg-primary-700 active:scale-100
+           px-5 py-3;
   }
 
   .btn-secondary {
-    @apply bg-white text-shine-text-primary
-           border border-shine-border
-           hover:bg-shine-hover-bg
-           px-4 py-2.5;
+    @apply bg-gray-100 text-flat-fg
+           hover:bg-gray-200 hover:scale-105
+           active:bg-gray-300 active:scale-100
+           px-5 py-3;
   }
 
   .btn-ghost {
-    @apply bg-transparent text-shine-text-secondary
-           hover:bg-shine-hover-bg
+    @apply bg-transparent text-flat-text-secondary
+           hover:bg-gray-100 hover:text-flat-fg
+           active:bg-gray-200
            px-4 py-2.5;
   }
 
   .btn-danger {
     @apply bg-red-500 text-white
-           hover:bg-red-600
-           px-4 py-2.5;
+           hover:bg-red-600 hover:scale-105
+           active:bg-red-700 active:scale-100
+           px-5 py-3;
   }
 
-  /* Input */
+  .btn-outline {
+    @apply bg-transparent border-2 border-primary-500 text-primary-500
+           hover:bg-primary-500 hover:text-white hover:scale-105
+           active:bg-primary-600 active:scale-100
+           px-5 py-3;
+  }
+
+  /* ══════════════════════════════════════
+     INPUTS — Gray bg, no border, bold focus
+  ══════════════════════════════════════ */
   .input {
-    @apply w-full px-4 py-2.5 rounded-lg
-           bg-white border border-shine-border
-           text-shine-text-primary text-sm
-           placeholder:text-shine-text-tertiary
-           focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30
-           transition-colors duration-150;
+    @apply w-full px-4 py-3 rounded-md
+           bg-gray-100 border-0
+           text-flat-fg text-sm font-medium
+           placeholder:text-flat-text-tertiary
+           focus:outline-none focus:bg-white focus:border-2 focus:border-primary-500
+           transition-all duration-200;
   }
 
-  /* Badges */
+  /* ══════════════════════════════════════
+     BADGES / STATUS — Flat solid fills
+  ══════════════════════════════════════ */
   .badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5
-           rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1
+           rounded-md text-xs font-semibold tracking-wide uppercase;
+  }
+
+  .badge-dot {
+    @apply w-2 h-2 rounded-full bg-current;
   }
 
   .badge-imported {
@@ -78,39 +156,90 @@
   }
 
   .badge-analyzing {
-    @apply bg-blue-50 text-blue-600;
+    @apply bg-blue-100 text-blue-700;
   }
 
   .badge-analyzed {
-    @apply bg-purple-50 text-purple-600;
+    @apply bg-violet-100 text-violet-700;
   }
 
   .badge-reviewing {
-    @apply bg-amber-50 text-amber-600;
+    @apply bg-amber-100 text-amber-700;
   }
 
   .badge-validated {
-    @apply bg-emerald-50 text-emerald-600;
+    @apply bg-emerald-100 text-emerald-700;
   }
 
   .badge-error {
-    @apply bg-red-50 text-red-600;
+    @apply bg-red-100 text-red-700;
   }
 
-  /* Focus Ring */
+  /* ══════════════════════════════════════
+     FOCUS RING — High contrast solid
+  ══════════════════════════════════════ */
   .focus-ring {
     @apply outline-none
-           focus-visible:ring-2 focus-visible:ring-primary-500/40
-           focus-visible:ring-offset-1 focus-visible:ring-offset-white;
+           focus-visible:ring-2 focus-visible:ring-primary-500
+           focus-visible:ring-offset-2 focus-visible:ring-offset-white;
   }
 
-  /* Divider */
+  /* ══════════════════════════════════════
+     DIVIDER — Color block, not thin line
+  ══════════════════════════════════════ */
   .divider {
-    @apply h-px bg-shine-border;
+    @apply h-px bg-gray-200;
   }
 
-  /* Loading skeleton */
+  /* ══════════════════════════════════════
+     SKELETON LOADING
+  ══════════════════════════════════════ */
   .skeleton {
-    @apply animate-pulse bg-slate-100 rounded-lg;
+    @apply bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100
+           bg-[length:400%_100%] animate-shimmer rounded-md;
+  }
+
+  /* ══════════════════════════════════════
+     SIDEBAR NAV ITEM
+  ══════════════════════════════════════ */
+  .nav-item {
+    @apply w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm font-medium
+           transition-all duration-200 cursor-pointer;
+  }
+
+  .nav-item-default {
+    @apply text-flat-text-secondary hover:bg-gray-100 hover:text-flat-fg;
+  }
+
+  .nav-item-active {
+    @apply bg-primary-500 text-white;
+  }
+
+  /* ══════════════════════════════════════
+     PAGE LAYOUT
+  ══════════════════════════════════════ */
+  .page-content {
+    @apply px-6 py-5 lg:px-8 lg:py-6;
+  }
+
+  /* ══════════════════════════════════════
+     TABLE
+  ══════════════════════════════════════ */
+  .table-header-cell {
+    @apply text-[11px] font-bold text-flat-text-tertiary uppercase tracking-widest;
+  }
+
+  /* ══════════════════════════════════════
+     STAT CARD — Flat color block
+  ══════════════════════════════════════ */
+  .stat-card {
+    @apply bg-gray-100 rounded-lg p-4 flex items-center gap-4;
+  }
+
+  /* ══════════════════════════════════════
+     SECTION LABEL
+  ══════════════════════════════════════ */
+  .section-label {
+    @apply text-[10px] font-bold text-flat-text-tertiary uppercase tracking-[0.08em];
   }
 }
