@@ -4,7 +4,7 @@ services:
     runtime: node
     region: frankfurt
     plan: free
-    buildCommand: npm install --include=dev && npx prisma generate && npx vite build
+    buildCommand: npm cache clean --force && npm install --include=dev && npx prisma generate && npx vite build
     startCommand: node server/api-simple.cjs
     envVars:
       - key: NODE_ENV
